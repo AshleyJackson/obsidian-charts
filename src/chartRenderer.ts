@@ -235,13 +235,23 @@ export default class Renderer {
 
   renderRaw(data: any, el: HTMLElement): Chart | null {
     console.log('Charts: Starting raw render with data type:', typeof data, 'chartOptions present:', !!data.chartOptions);
-    const destination = el.createEl('canvas');
+    
+    // Create container for chart and resize handle
+    const container = el.createDiv({ cls: 'chart-container' });
+    const destination = container.createEl('canvas');
+    
+    // Create resize handle
+    const resizeHandle = container.createDiv({ cls: 'chart-resize-handle' });
 
     if (data.chartOptions) {
       try {
         let chart = new Chart(destination.getContext("2d")!, data.chartOptions);
-        destination.parentElement!.style.width = data.width ?? "100%";
-        destination.parentElement!.style.margin = "auto";
+        container.style.width = data.width ?? "100%";
+        container.style.margin = "auto";
+        
+        // Setup resize functionality
+        this.setupResizeHandle(container, resizeHandle, chart, data);
+        
         console.log('Charts: Raw chart rendered successfully with options');
         return chart;
       } catch (error) {
@@ -252,6 +262,7 @@ export default class Renderer {
     } else {
       try {
         let chart = new Chart(destination.getContext("2d")!, data);
+        this.setupResizeHandle(container, resizeHandle, chart, data);
         console.log('Charts: Raw chart rendered successfully with raw data');
         return chart;
       } catch (error) {
@@ -260,6 +271,47 @@ export default class Renderer {
         return null;
       }
     }
+  }
+
+  private setupResizeHandle(container: HTMLElement, handle: HTMLElement, chart: Chart, data: any) {
+    let isResizing = false;
+    let startX = 0;
+    let startWidth = 0;
+
+    handle.addEventListener('mousedown', (e: MouseEvent) => {
+      isResizing = true;
+      startX = e.clientX;
+      startWidth = container.offsetWidth;
+      container.classList.add('chart-resizing');
+      document.body.style.cursor = 'ew-resize';
+      document.body.style.userSelect = 'none';
+      e.preventDefault();
+    });
+
+    const onMouseMove = (e: MouseEvent) => {
+      if (!isResizing) return;
+      const diff = e.clientX - startX;
+      const newWidth = Math.max(200, startWidth + diff); // Minimum 200px
+      container.style.width = `${newWidth}px`;
+      chart.resize();
+    };
+
+    const onMouseUp = () => {
+      if (isResizing) {
+        isResizing = false;
+        container.classList.remove('chart-resizing');
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        
+        // Store the new width in data for persistence
+        if (data) {
+          data.width = `${container.offsetWidth}px`;
+        }
+      }
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
   }
 
     async renderFromYaml(yaml: any, el: HTMLElement, ctx: MarkdownPostProcessorContext) {
