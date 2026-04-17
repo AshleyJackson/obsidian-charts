@@ -29,20 +29,25 @@ export default class ChartPlugin extends Plugin {
     el: HTMLElement,
     ctx: MarkdownPostProcessorContext
   ) => {
+    console.log('Charts: Processing chart code block, content length:', content.length);
     let data;
     try {
       data = await parseYaml(content.replace(/	/g, '    '));
+      console.log('Charts: Parsed YAML data:', data.type, 'labels length:', data.labels?.length, 'series count:', data.series?.length);
     } catch (error) {
+      console.error('Charts: YAML parse error:', error);
       renderError(error, el);
       return;
     }
     if (!data.id) {
       if (!data || !data.type || !data.labels || !data.series) {
+        console.error('Charts: Missing required fields in data:', data);
         renderError('Missing type, labels or series', el);
         return;
       }
     }
     if (data.bestFit === true && data.type === 'line') {
+      console.log('Charts: Applying best fit line');
       if (data.bestFitNumber != undefined) {
         var x = data.series[Number(data.bestFitNumber)].data;
       } else {
@@ -82,8 +87,11 @@ export default class ChartPlugin extends Plugin {
         title: title,
         data: YVals,
       });
+      console.log('Charts: Added best fit series:', title);
     }
+    console.log('Charts: Starting render from YAML');
     await this.renderer.renderFromYaml(data, el, ctx);
+    console.log('Charts: Render from YAML complete');
   };
 
   async loadSettings() {
@@ -95,7 +103,7 @@ export default class ChartPlugin extends Plugin {
   }
 
   async onload() {
-    console.log('loading plugin: Charts');
+    console.log('Charts: Loading plugin');
 
     await this.loadSettings();
 
@@ -106,15 +114,21 @@ export default class ChartPlugin extends Plugin {
     //@ts-ignore
     window.renderChart = this.renderer.renderRaw;
 
+    console.log('Charts: Initialized renderer and global renderChart');
+
     this.addSettingTab(new ChartSettingTab(this.app, this));
+
+    console.log('Charts: Added settings tab');
 
     this.addCommand({
       id: 'creation-helper',
       name: 'Insert new Chart',
       checkCallback: (checking: boolean) => {
+        console.log('Charts: Checking for creation helper command');
         let leaf = this.app.workspace.activeLeaf;
         if (leaf.view instanceof MarkdownView) {
           if (!checking) {
+            console.log('Charts: Opening creation helper modal');
             new CreationHelperModal(
               this.app,
               leaf.view,
@@ -132,6 +146,7 @@ export default class ChartPlugin extends Plugin {
       id: 'chart-from-table-column',
       name: 'Create Chart from Table (Column oriented Layout)',
       editorCheckCallback: (checking: boolean, editor: Editor, view: View) => {
+        console.log('Charts: Checking for chart from table column command');
         let selection = editor.getSelection();
         if (
           view instanceof MarkdownView &&
@@ -139,6 +154,7 @@ export default class ChartPlugin extends Plugin {
           selection.split('|').length >= 2
         ) {
           if (!checking) {
+            console.log('Charts: Generating chart from table (columns)');
             chartFromTable(editor, 'columns');
           }
           return true;
@@ -151,12 +167,14 @@ export default class ChartPlugin extends Plugin {
       id: 'chart-from-table-row',
       name: 'Create Chart from Table (Row oriented Layout)',
       editorCheckCallback: (checking: boolean, editor: Editor, view: View) => {
+        console.log('Charts: Checking for chart from table row command');
         if (
           view instanceof MarkdownView &&
           editor.getSelection().split('\n').length >= 3 &&
           editor.getSelection().split('|').length >= 2
         ) {
           if (!checking) {
+            console.log('Charts: Generating chart from table (rows)');
             chartFromTable(editor, 'rows');
           }
           return true;
@@ -169,12 +187,14 @@ export default class ChartPlugin extends Plugin {
       id: 'chart-to-svg',
       name: 'Create Image from Chart',
       editorCheckCallback: (checking: boolean, editor: Editor, view: View) => {
+        console.log('Charts: Checking for chart to SVG command');
         if (
           view instanceof MarkdownView &&
           editor.getSelection().startsWith('```chart') &&
           editor.getSelection().endsWith('```')
         ) {
           if (!checking) {
+            console.log('Charts: Starting chart to image rendering');
             new Notice('Rendering Chart...');
             saveImageToVaultAndPaste(
               editor,
@@ -196,6 +216,8 @@ export default class ChartPlugin extends Plugin {
       async (data, el) => this.renderer.renderRaw(await JSON.parse(data), el)
     );
 
+    console.log('Charts: Registered code block processors');
+
     // Remove this ignore when the obsidian package is updated on npm
     // Editor mode
     // @ts-ignore
@@ -209,6 +231,7 @@ export default class ChartPlugin extends Plugin {
                 .setTitle('Insert Chart')
                 .setIcon('chart')
                 .onClick((_) => {
+                  console.log('Charts: Context menu clicked, opening modal');
                   new CreationHelperModal(
                     this.app,
                     view,
@@ -221,6 +244,8 @@ export default class ChartPlugin extends Plugin {
         }
       )
     );
+
+    console.log('Charts: Plugin fully loaded');
   }
 
   onunload() {

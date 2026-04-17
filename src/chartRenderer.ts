@@ -21,234 +21,249 @@ export default class Renderer {
         this.plugin = plugin;
     }
 
-    async datasetPrep(yaml: any, el: HTMLElement, themeColors = false): Promise<{ chartOptions: ChartConfiguration; width: string; }> {
-        let datasets = [];
-        if (!yaml.id) {
-            const colors = [];
-            if (this.plugin.settings.themeable || themeColors) {
-                let i = 1;
-                while (true) {
-                    let color = getComputedStyle(el).getPropertyValue(`--chart-color-${i}`);
-                    if (color) {
-                        colors.push(color);
-                        i++;
-                    } else {
-                        break;
-                    }
-                }
-            }
-            for (let i = 0; yaml.series.length > i; i++) {
-                const {title, ...rest} = yaml.series[i];
-                const dataset = {
-                    label: title ?? "",
-                    backgroundColor: yaml.labelColors ? colors.length ? generateInnerColors(colors, yaml.transparency) : generateInnerColors(this.plugin.settings.colors, yaml.transparency) : colors.length ? generateInnerColors(colors, yaml.transparency)[i] : generateInnerColors(this.plugin.settings.colors, yaml.transparency)[i],
-                    borderColor: yaml.labelColors ? colors.length ? colors : this.plugin.settings.colors : colors.length ? colors[i] : this.plugin.settings.colors[i],
-                    borderWidth: 1,
-                    fill: yaml.fill ? yaml.stacked ? i == 0 ? 'origin' : '-1' : true : false, //See https://github.com/phibr0/obsidian-charts/issues/53#issuecomment-1084869550
-                    tension: yaml.tension ?? 0,
-                    ...rest,
-                };
-                if (yaml.type === 'sankey') {
-                    // colorFrom, colorTo is accepted as object in yaml, but should be function for sankey.
-                    if (dataset.colorFrom)
-                        (dataset as SankeyControllerDatasetOptions).colorFrom = (c) => yaml.series[i].colorFrom[c.dataset.data[c.dataIndex].from] ?? colors[i] ?? 'green'
-                    
-                    if (dataset.colorTo)
-                        (dataset as SankeyControllerDatasetOptions).colorTo = (c) => yaml.series[i].colorTo[c.dataset.data[c.dataIndex].to] ?? colors[i] ?? 'green'
-                    
-                }
-                datasets.push(dataset);
-            }
+  async datasetPrep(yaml: any, el: HTMLElement, themeColors = false): Promise<{ chartOptions: ChartConfiguration; width: string; }> {
+    console.log('Charts: Preparing dataset for type:', yaml.type, 'with series count:', yaml.series?.length || 0);
+    let datasets = [];
+    if (!yaml.id) {
+      const colors = [];
+      if (this.plugin.settings.themeable || themeColors) {
+        let i = 1;
+        while (true) {
+          let color = getComputedStyle(el).getPropertyValue(`--chart-color-${i}`);
+          if (color) {
+            colors.push(color);
+            i++;
+          } else {
+            break;
+          }
         }
-
-        let time = yaml.time ? { type: 'time', time: { unit: yaml.time } } : null
-
-        let labels = yaml.labels;
-
-        const gridColor = getComputedStyle(el).getPropertyValue('--background-modifier-border');
-
-        let chartOptions: ChartConfiguration;
-
-        Chart.defaults.color = yaml.textColor || getComputedStyle(el).getPropertyValue('--text-muted');
-        Chart.defaults.font.family = getComputedStyle(el).getPropertyValue('--mermaid-font');
-        Chart.defaults.plugins = {
-            ...Chart.defaults.plugins,
-            legend: {
-                ...Chart.defaults.plugins.legend,
-                display: yaml.legend ?? true,
-                position: yaml.legendPosition ?? "top",
-            },
+      }
+      console.log('Charts: Using colors:', colors.length > 0 ? 'theme colors' : 'default colors');
+      for (let i = 0; yaml.series.length > i; i++) {
+        const {title, ...rest} = yaml.series[i];
+        const dataset = {
+          label: title ?? "",
+          backgroundColor: yaml.labelColors ? colors.length ? generateInnerColors(colors, yaml.transparency) : generateInnerColors(this.plugin.settings.colors, yaml.transparency) : colors.length ? generateInnerColors(colors, yaml.transparency)[i] : generateInnerColors(this.plugin.settings.colors, yaml.transparency)[i],
+          borderColor: yaml.labelColors ? colors.length ? colors : this.plugin.settings.colors : colors.length ? colors[i] : this.plugin.settings.colors[i],
+          borderWidth: 1,
+          fill: yaml.fill ? yaml.stacked ? i == 0 ? 'origin' : '-1' : true : false, //See https://github.com/phibr0/obsidian-charts/issues/53#issuecomment-1084869550
+          tension: yaml.tension ?? 0,
+          ...rest,
         };
-        Chart.defaults.layout.padding = yaml.padding;
-
-        if (yaml.type == 'radar' || yaml.type == 'polarArea') {
-            (chartOptions as ChartConfiguration<"polarArea" | "radar">) = {
-                type: yaml.type,
-                data: {
-                    labels,
-                    datasets
-                },
-                options: {
-                    animation: {
-                        duration: 0
-                    },
-                    scales: {
-                        //@ts-ignore
-                        r: {
-                            ...time,
-                            grid: { color: gridColor },
-                            beginAtZero: yaml.beginAtZero,
-                            max: yaml.rMax,
-                            min: yaml.rMin,
-                            ticks: {
-                                backdropColor: gridColor
-                            }
-                        },
-                    },
-                }
-            };
-        } else if (yaml.type == 'bar' || yaml.type == 'line') {
-            (chartOptions as ChartConfiguration<"bar" | "line">) = {
-                type: yaml.type,
-                data: {
-                    labels,
-                    datasets
-                },
-                options: {
-                    animation: {
-                        duration: 0
-                    },
-                    indexAxis: yaml.indexAxis,
-                    spanGaps: yaml.spanGaps,
-                    scales: {
-                        y: {
-                            min: yaml.yMin,
-                            max: yaml.yMax,
-                            reverse: yaml.yReverse,
-                            ticks: {
-                                display: yaml.yTickDisplay,
-                                padding: yaml.yTickPadding
-                            },
-                            display: yaml.yDisplay,
-                            stacked: yaml.stacked,
-                            beginAtZero: yaml.beginAtZero,
-                            grid: { color: gridColor },
-                            title: {
-                                display: yaml.yTitle,
-                                text: yaml.yTitle
-                            }
-                        },
-                        //@ts-ignore
-                        x: {
-                            ...time,
-                            min: yaml.xMin,
-                            max: yaml.xMax,
-                            reverse: yaml.xReverse,
-                            ticks: {
-                                display: yaml.xTickDisplay,
-                                padding: yaml.xTickPadding
-                            },
-                            display: yaml.xDisplay,
-                            stacked: yaml.stacked,
-                            grid: { color: gridColor },
-                            title: {
-                                display: yaml.xTitle,
-                                text: yaml.xTitle
-                            }
-                        }
-                    },
-                }
-            };
-        } else if (yaml.type === 'sankey') {
-            datasets = datasets.map(dataset => {
-                return {
-                    ...dataset,
-                    data: dataset.data.map((item: object | any[]) => 
-                        Array.isArray(item) && item.length === 3 ?
-                        {
-                            from: item[0],
-                            flow: item[1],
-                            to: item[2],
-                        } : item
-                    )
-                }
-            }) as ChartConfiguration<'sankey'>['data']['datasets'];
+        if (yaml.type === 'sankey') {
+          // colorFrom, colorTo is accepted as object in yaml, but should be function for sankey.
+          if (dataset.colorFrom)
+            (dataset as SankeyControllerDatasetOptions).colorFrom = (c) => yaml.series[i].colorFrom[c.dataset.data[c.dataIndex].from] ?? colors[i] ?? 'green'
             
-            (chartOptions as ChartConfiguration<'sankey'>) = {
-                type: yaml.type,
-                data: {
-                    labels,
-                    datasets,
-                },
-                options: {
-                    animation: {
-                        duration: 0
-                    },
-                }
-            }
-        }else {
-            (chartOptions as ChartConfiguration<"pie" | "doughnut" | "bubble" | "scatter">) = {
-                type: yaml.type,
-                data: {
-                    labels,
-                    datasets
-                },
-                options: {
-                    animation: {
-                        duration: 0
-                    },
-                    //@ts-ignore
-                    spanGaps: yaml.spanGaps,
-                }
-            };
+          if (dataset.colorTo)
+            (dataset as SankeyControllerDatasetOptions).colorTo = (c) => yaml.series[i].colorTo[c.dataset.data[c.dataIndex].to] ?? colors[i] ?? 'green'
+            
         }
-        return { chartOptions, width: yaml.width };
+        datasets.push(dataset);
+      }
     }
+
+    let time = yaml.time ? { type: 'time', time: { unit: yaml.time } } : null
+
+    let labels = yaml.labels;
+
+    const gridColor = getComputedStyle(el).getPropertyValue('--background-modifier-border');
+
+    let chartOptions: ChartConfiguration;
+
+    Chart.defaults.color = yaml.textColor || getComputedStyle(el).getPropertyValue('--text-muted');
+    Chart.defaults.font.family = getComputedStyle(el).getPropertyValue('--mermaid-font');
+    Chart.defaults.plugins = {
+      ...Chart.defaults.plugins,
+      legend: {
+        ...Chart.defaults.plugins.legend,
+        display: yaml.legend ?? true,
+        position: yaml.legendPosition ?? "top",
+      },
+    };
+    Chart.defaults.layout.padding = yaml.padding;
+
+    if (yaml.type == 'radar' || yaml.type == 'polarArea') {
+      console.log('Charts: Configuring radar/polarArea chart');
+      (chartOptions as ChartConfiguration<"polarArea" | "radar">) = {
+        type: yaml.type,
+        data: {
+          labels,
+          datasets
+        },
+        options: {
+          animation: {
+            duration: 0
+          },
+          scales: {
+            //@ts-ignore
+            r: {
+              ...time,
+              grid: { color: gridColor },
+              beginAtZero: yaml.beginAtZero,
+              max: yaml.rMax,
+              min: yaml.rMin,
+              ticks: {
+                backdropColor: gridColor
+              }
+            },
+          },
+        }
+      };
+    } else if (yaml.type == 'bar' || yaml.type == 'line') {
+      console.log('Charts: Configuring bar/line chart');
+      (chartOptions as ChartConfiguration<"bar" | "line">) = {
+        type: yaml.type,
+        data: {
+          labels,
+          datasets
+        },
+        options: {
+          animation: {
+            duration: 0
+          },
+          indexAxis: yaml.indexAxis,
+          spanGaps: yaml.spanGaps,
+          scales: {
+            y: {
+              min: yaml.yMin,
+              max: yaml.yMax,
+              reverse: yaml.yReverse,
+              ticks: {
+                display: yaml.yTickDisplay,
+                padding: yaml.yTickPadding
+              },
+              display: yaml.yDisplay,
+              stacked: yaml.stacked,
+              beginAtZero: yaml.beginAtZero,
+              grid: { color: gridColor },
+              title: {
+                display: yaml.yTitle,
+                text: yaml.yTitle
+              }
+            },
+            //@ts-ignore
+            x: {
+              ...time,
+              min: yaml.xMin,
+              max: yaml.xMax,
+              reverse: yaml.xReverse,
+              ticks: {
+                display: yaml.xTickDisplay,
+                padding: yaml.xTickPadding
+              },
+              display: yaml.xDisplay,
+              stacked: yaml.stacked,
+              grid: { color: gridColor },
+              title: {
+                display: yaml.xTitle,
+                text: yaml.xTitle
+              }
+            }
+          },
+        }
+      };
+    } else if (yaml.type === 'sankey') {
+      console.log('Charts: Configuring sankey chart');
+      datasets = datasets.map(dataset => {
+        return {
+          ...dataset,
+          data: dataset.data.map((item: object | any[]) => 
+            Array.isArray(item) && item.length === 3 ?
+            {
+              from: item[0],
+              flow: item[1],
+              to: item[2],
+            } : item
+          )
+        }
+      }) as ChartConfiguration<'sankey'>['data']['datasets'];
+      
+      (chartOptions as ChartConfiguration<'sankey'>) = {
+        type: yaml.type,
+        data: {
+          labels,
+          datasets,
+        },
+        options: {
+          animation: {
+            duration: 0
+          },
+        }
+      }
+    }else {
+      console.log('Charts: Configuring pie/doughnut/bubble/scatter chart for type:', yaml.type);
+      (chartOptions as ChartConfiguration<"pie" | "doughnut" | "bubble" | "scatter">) = {
+        type: yaml.type,
+        data: {
+          labels,
+          datasets
+        },
+        options: {
+          animation: {
+            duration: 0
+          },
+          //@ts-ignore
+          spanGaps: yaml.spanGaps,
+        }
+      };
+    }
+    console.log('Charts: Dataset prep complete, returning options');
+    return { chartOptions, width: yaml.width };
+  }
 
     /**
      * @param yaml the copied codeblock
      * @returns base64 encoded image in png format
      */
-    async imageRenderer(yaml: string, options: ImageOptions): Promise<string> {
-        const delay = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
-        const destination = document.createElement('canvas');
-        const destinationContext = destination.getContext("2d");
+  async imageRenderer(yaml: string, options: ImageOptions): Promise<string> {
+    console.log('Charts: Starting image renderer for format:', options.format, 'quality:', options.quality);
+    const delay = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
+    const destination = document.createElement('canvas');
+    const destinationContext = destination.getContext("2d");
 
-        const chartOptions = await this.datasetPrep(await parseYaml(yaml.replace("```chart", "").replace("```", "").replace(/\t/g, '    ')), document.body);
+    const chartOptions = await this.datasetPrep(await parseYaml(yaml.replace("```chart", "").replace("```", "").replace(/\t/g, '    ')), document.body);
+    console.log('Charts: Prepared options for image');
 
-        new Chart(destinationContext, chartOptions.chartOptions);
+    new Chart(destinationContext, chartOptions.chartOptions);
 
-        document.body.append(destination);
-        await delay(250);
-        const dataurl = destination.toDataURL(options.format, options.quality);
-        document.body.removeChild(destination);
+    document.body.append(destination);
+    await delay(250);
+    const dataurl = destination.toDataURL(options.format, options.quality);
+    document.body.removeChild(destination);
+    console.log('Charts: Image data URL generated, length:', dataurl.length);
 
-        return dataurl.substring(dataurl.indexOf(',') + 1);
+    return dataurl.substring(dataurl.indexOf(',') + 1);
+  }
+
+  renderRaw(data: any, el: HTMLElement): Chart | null {
+    console.log('Charts: Starting raw render with data type:', typeof data, 'chartOptions present:', !!data.chartOptions);
+    const destination = el.createEl('canvas');
+
+    if (data.chartOptions) {
+      try {
+        let chart = new Chart(destination.getContext("2d"), data.chartOptions);
+        destination.parentElement.style.width = data.width ?? "100%";
+        destination.parentElement.style.margin = "auto";
+        console.log('Charts: Raw chart rendered successfully with options');
+        return chart;
+      } catch (error) {
+        console.error('Charts: Error rendering chart with options:', error);
+        renderError(error, el);
+        return null;
+      }
+    } else {
+      try {
+        let chart = new Chart(destination.getContext("2d"), data);
+        console.log('Charts: Raw chart rendered successfully with raw data');
+        return chart;
+      } catch (error) {
+        console.error('Charts: Error rendering chart with raw data:', error);
+        renderError(error, el);
+        return null;
+      }
     }
-
-    renderRaw(data: any, el: HTMLElement): Chart | null {
-        const destination = el.createEl('canvas');
-
-        if (data.chartOptions) {
-            try {
-                let chart = new Chart(destination.getContext("2d"), data.chartOptions);
-                destination.parentElement.style.width = data.width ?? "100%";
-                destination.parentElement.style.margin = "auto";
-                return chart;
-            } catch (error) {
-                renderError(error, el);
-                return null;
-            }
-        } else {
-            try {
-                let chart = new Chart(destination.getContext("2d"), data);
-                return chart;
-            } catch (error) {
-                renderError(error, el);
-                return null;
-            }
-        }
-    }
+  }
 
     async renderFromYaml(yaml: any, el: HTMLElement, ctx: MarkdownPostProcessorContext) {
         this.plugin.app.workspace.onLayoutReady(() => ctx.addChild(new ChartRenderChild(yaml, el, this, ctx.sourcePath)));
@@ -272,22 +287,77 @@ class ChartRenderChild extends MarkdownRenderChild {
         this.reload = this.reload.bind(this);
     }
 
-    async onload() {
+  async onload() {
+    console.log('Charts: Loading chart render child for data:', this.data);
+    try {
+      const data = await this.renderer.datasetPrep(this.data, this.el);
+      console.log('Charts: Prepared dataset:', data);
+      let x: any = {};
+      if (this.data.id) {
+        console.log('Charts: Processing linked chart with id:', this.data.id);
+        const colors = [];
+        if (this.renderer.plugin.settings.themeable) {
+          let i = 1;
+          while (true) {
+            let color = getComputedStyle(this.el).getPropertyValue(`--chart-color-${i}`);
+            if (color) {
+              colors.push(color);
+              i++;
+            } else {
+              break;
+            }
+          }
+        }
+        x.datasets = [];
+        let linkDest: TFile;
+        if (this.data.file) linkDest = this.renderer.plugin.app.metadataCache.getFirstLinkpathDest(this.data.file, this.renderer.plugin.app.workspace.getActiveFile().path);
+        const pos = this.renderer.plugin.app.metadataCache.getFileCache(
+          linkDest ?? this.renderer.plugin.app.vault.getAbstractFileByPath(this.ownPath) as TFile).sections.find(pre => pre.id === this.data.id)?.position;
+        if (!pos) {
+          throw "Invalid id and/or file";
+        }
+
+        const tableString = (await this.renderer.plugin.app.vault.cachedRead(this.data.file ? linkDest : this.renderer.plugin.app.vault.getAbstractFileByPath(this.ownPath) as TFile)).substring(pos.start.offset, pos.end.offset);
+        console.log('Charts: Extracted table string length:', tableString.length);
+        let tableData;
         try {
-            const data = await this.renderer.datasetPrep(this.data, this.el);
-            let x: any = {};
-            if (this.data.id) {
-                const colors = [];
-                if (this.renderer.plugin.settings.themeable) {
-                    let i = 1;
-                    while (true) {
-                        let color = getComputedStyle(this.el).getPropertyValue(`--chart-color-${i}`);
-                        if (color) {
-                            colors.push(color);
-                            i++;
-                        } else {
-                            break;
-                        }
+          tableData = generateTableData(tableString, this.data.layout ?? 'columns', this.data.select);
+          console.log('Charts: Generated table data:', tableData);
+        } catch (error) {
+          console.error('Charts: Error generating table data:', error);
+          throw "There is no table at that id and/or file"
+        }
+        x.labels = tableData.labels;
+        for (let i = 0; tableData.dataFields.length > i; i++) {
+          x.datasets.push({
+            label: tableData.dataFields[i].dataTitle ?? "",
+            data: tableData.dataFields[i].data,
+            backgroundColor: this.data.labelColors ? colors.length ? generateInnerColors(colors, this.data.transparency) : generateInnerColors(this.renderer.plugin.settings.colors, this.data.transparency) : colors.length ? generateInnerColors(colors, this.data.transparency)[i] : generateInnerColors(this.renderer.plugin.settings.colors, this.data.transparency)[i],
+            borderColor: this.data.labelColors ? colors.length ? colors : this.renderer.plugin.settings.colors : colors.length ? colors[i] : this.renderer.plugin.settings.colors[i],
+            borderWidth: 1,
+            fill: this.data.fill ? this.data.stacked ? i == 0 ? 'origin' : '-1' : true : false,
+            tension: this.data.tension ?? 0,
+          });
+        }
+        data.chartOptions.data.labels = x.labels;
+        data.chartOptions.data.datasets = x.datasets;
+        console.log('Charts: Updated chart options with table data');
+
+
+      }
+      this.chart = this.renderer.renderRaw(data, this.el);
+      console.log('Charts: Rendered chart successfully');
+    } catch (error) {
+      console.error('Charts: Error in onload:', error);
+      renderError(error, this.el);
+    }
+    if (this.data.id) {
+      console.log('Charts: Registering change handler for linked chart');
+      this.renderer.plugin.app.metadataCache.on("changed", this.changeHandler);
+    }
+    this.renderer.plugin.app.workspace.on('css-change', this.reload);
+    console.log('Charts: Registered event listeners');
+  }
                     }
                 }
                 x.datasets = [];
@@ -339,16 +409,26 @@ class ChartRenderChild extends MarkdownRenderChild {
         }
     }
 
-    reload() {
-        this.onunload();
-        this.onload();
-    }
+  reload() {
+    console.log('Charts: Reloading chart');
+    this.onunload();
+    this.onload();
+  }
 
-    onunload() {
-        this.renderer.plugin.app.metadataCache.off("changed", this.changeHandler);
-        this.renderer.plugin.app.workspace.off('css-change', this.reload);
-        this.el.empty();
-        this.chart && this.chart.destroy();
-        this.chart = null;
+  changeHandler(file: TFile) {
+    console.log('Charts: Metadata changed for file:', file.path);
+    if (this.data.file ? file.basename === this.data.file : file.path === this.ownPath) {
+      console.log('Charts: Reloading due to relevant file change');
+      this.reload();
     }
+  }
+
+  onunload() {
+    console.log('Charts: Unloading chart render child');
+    this.renderer.plugin.app.metadataCache.off("changed", this.changeHandler);
+    this.renderer.plugin.app.workspace.off('css-change', this.reload);
+    this.el.empty();
+    this.chart && this.chart.destroy();
+    this.chart = null;
+  }
 }
