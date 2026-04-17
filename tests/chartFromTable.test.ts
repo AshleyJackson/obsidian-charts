@@ -48,4 +48,15 @@ describe('generateTableData', () => {
     const result = generateTableData(table, 'columns', ['B']);
     expect(result.dataFields[0].dataTitle).toBe('B');
   });
+
+  it('auto-transposes date-based tables for time series', () => {
+    // Table with dates in first column - should auto-transpose
+    const table = '| Date | Value |\n|------|-------|\n| 2026-03-17 | 5 |\n| 2026-03-18 | 3 |\n| 2026-03-19 | 7 |';
+    const result = generateTableData(table, 'rows');
+    // After transpose: dates become labels, 'Value' becomes series title
+    expect(result.labels).toEqual(['2026-03-17', '2026-03-18', '2026-03-19']);
+    expect(result.dataFields).toHaveLength(1);
+    expect(result.dataFields[0].dataTitle).toBe('Value');
+    expect(result.dataFields[0].data).toEqual(['5', '3', '7']);
+  });
 });

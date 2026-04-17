@@ -2,7 +2,7 @@
 
 ## Overview
 
-Obsidian Charts is an Obsidian plugin that enables users to create interactive charts within their notes using Chart.js. This guide documents the testing infrastructure for future AI agents.
+Obsidian Charts is an Obsidian plugin that enables users to create interactive charts within their notes using Chart.js. This guide documents the testing infrastructure and key features for future AI agents.
 
 ## Project Structure
 
@@ -32,6 +32,24 @@ obsidian-charts/
 ├── jest.config.js          # Jest configuration
 └── jest.tsconfig.json      # TypeScript config for tests
 ```
+
+## Key Features
+
+### Date Auto-Transpose for Tables
+When `generateTableData()` detects date-like field keys, it automatically transposes the data for proper time series display:
+- **Before transpose**: Dates become series names (wrong for time series)
+- **After transpose**: Dates become X-axis labels, columns become series
+
+Date detection uses **Luxon** library (`DateTime.fromISO()` and `DateTime.fromFormat()`) for robust parsing:
+- ISO format: `2026-03-17`
+- US format: `03/17/2026`, `3/17/2026`
+- European format: `17/03/2026`, `17-03-2026`
+- And more...
+
+**Dependencies:** `luxon` (runtime), `@types/luxon` (dev)
+
+### Block ID Linking
+Charts can link to tables using block IDs. The ID format uses `^` prefix in YAML (e.g., `id: ^my-table`) but Obsidian's cache stores IDs without the prefix. The code strips the leading `^` when searching `fileCache.sections`.
 
 ## Testing Architecture
 
@@ -105,6 +123,7 @@ Tests chart rendering:
 Tests table-to-chart conversion:
 - `chartFromTable()` - Converts selected table to chart code
 - `generateTableData()` - Parses markdown table to data
+- **Date auto-transpose** - Detects date fields and transposes for time series
 
 ## Key Mock Implementations
 
@@ -142,6 +161,12 @@ const registerables = []; // Empty for testing
 ### Issue: "Class extends value undefined"
 **Solution:** Ensure the mock exports all classes that source code extends (e.g., `Modal`, `PluginSettingTab`).
 
+### Issue: "Invalid id and/or file" for linked charts
+**Solution:** Block IDs in YAML use `^` prefix (e.g., `^my-table`), but Obsidian's cache stores IDs without it. The code strips the leading `^` when searching.
+
+### Issue: Time series chart shows many series instead of one
+**Solution:** Date auto-transpose feature handles this automatically. If field keys are date-like, data is transposed so dates become X-axis labels.
+
 ## Adding New Tests
 
 1. Create test file in `tests/` directory
@@ -149,6 +174,7 @@ const registerables = []; // Empty for testing
 3. Use real DOM elements for tests involving `getComputedStyle()`
 4. Add HTMLElement prototype extensions if needed
 5. Create additional mocks in `__mocks__/` for new dependencies
+6. **Always update tests when adding new features** - test coverage is mandatory
 
 ## Dependencies
 
@@ -157,6 +183,7 @@ const registerables = []; // Empty for testing
 - `chartjs-chart-sankey` - Sankey diagram support
 - `chartjs-plugin-annotation` - Chart annotations
 - `chroma-js` - Color manipulation
+- `luxon` - Date parsing and validation
 - `markdown-tables-to-json` - Table parsing
 - `svelte` - UI framework
 - `vanilla-picker` - Color picker
@@ -166,11 +193,14 @@ const registerables = []; // Empty for testing
 - `ts-jest` - TypeScript support for Jest
 - `jest-canvas-mock` - Canvas mocking
 - `jest-environment-jsdom` - DOM environment
+- `@types/luxon` - TypeScript types for Luxon
 
 ## Notes for Future Agents
 
 1. **Don't remove mocks** - The obsidian mock is essential since the package is type-only
 2. **Use real DOM elements** - When testing code that uses `getComputedStyle()`
 3. **Extend HTMLElement** - Add Obsidian's helper methods to the prototype
-4. **Check markdown-tables-to-json behavior** - It treats first column as labels, not data
-5. **ESM modules need mocking** - The date-adapter uses ESM imports from obsidian
+4. **Date auto-transpose** - Tables with date keys are automatically transposed for time series
+5. **Block IDs** - Strip `^` prefix when searching Obsidian's fileCache.sections
+6. **ESM modules need mocking** - The date-adapter uses ESM imports from obsidian
+7. **Always update tests** - When adding features, add corresponding tests in the same session
