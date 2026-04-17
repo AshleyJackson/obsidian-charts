@@ -37,6 +37,10 @@ export default class Renderer {
       console.log('Charts: Using colors:', colors.length > 0 ? 'theme colors' : 'default colors');
       for (let i = 0; yaml.series.length > i; i++) {
         const {title, ...rest} = yaml.series[i];
+        // Ensure data values are numbers - YAML parsing can return strings
+        if (rest.data && Array.isArray(rest.data)) {
+          rest.data = rest.data.map((v: any) => typeof v === 'string' ? parseFloat(v) : v);
+        }
         const dataset = {
           label: title ?? "",
           backgroundColor: yaml.labelColors ? colors.length ? generateInnerColors(colors, yaml.transparency) : generateInnerColors(this.plugin.settings.colors, yaml.transparency) : colors.length ? generateInnerColors(colors, yaml.transparency)[i] : generateInnerColors(this.plugin.settings.colors, yaml.transparency)[i],
@@ -356,9 +360,11 @@ class ChartRenderChild extends MarkdownRenderChild {
         }
         chartData.labels = tableData.labels;
         for (let i = 0; tableData.dataFields.length > i; i++) {
+          // Ensure data values are numbers - table extraction can return strings
+          const numericData = tableData.dataFields[i].data.map((v: any) => typeof v === 'string' ? parseFloat(v) : v);
           chartData.datasets.push({
             label: tableData.dataFields[i].dataTitle ?? "",
-            data: tableData.dataFields[i].data,
+            data: numericData,
             backgroundColor: this.data.labelColors ? colors.length ? generateInnerColors(colors, this.data.transparency) : generateInnerColors(this.renderer.plugin.settings.colors, this.data.transparency) : colors.length ? generateInnerColors(colors, this.data.transparency)[i] : generateInnerColors(this.renderer.plugin.settings.colors, this.data.transparency)[i],
             borderColor: this.data.labelColors ? colors.length ? colors : this.renderer.plugin.settings.colors : colors.length ? colors[i] : this.renderer.plugin.settings.colors[i],
             borderWidth: 1,

@@ -109,6 +109,31 @@ describe('Renderer', () => {
       expect(result.chartOptions.data.datasets[0].stepped).toBe(true);
     });
 
+    it('converts string data values to numbers', async () => {
+      // YAML parsing can return numeric values as strings
+      const yaml = {
+        type: 'bar',
+        labels: ['A', 'B', 'C'],
+        series: [{ title: 'S1', data: ['12', '28', '25'] }]
+      };
+
+      const result = await renderer.datasetPrep(yaml, mockEl);
+
+      expect(result.chartOptions.data.datasets[0].data).toEqual([12, 28, 25]);
+    });
+
+    it('handles mixed string and numeric data values', async () => {
+      const yaml = {
+        type: 'bar',
+        labels: ['A', 'B', 'C', 'D'],
+        series: [{ title: 'S1', data: [12.0, '15.0', 9, '2'] }]
+      };
+
+      const result = await renderer.datasetPrep(yaml, mockEl);
+
+      expect(result.chartOptions.data.datasets[0].data).toEqual([12, 15, 9, 2]);
+    });
+
     it('passes tension property to dataset', async () => {
       const yaml = {
         type: 'line',
