@@ -24,6 +24,10 @@ jobs:
     - name: Build plugin
       run: npm run build
 
+    - name: Generate random suffix
+      id: random
+      run: echo "suffix=$(head /dev/urandom | LC_ALL=C tr -dc 'a-z0-9' | head -c 8)" >> $GITHUB_OUTPUT
+
     - name: Package zip
       run: |
         zip -r ${{ github.event.repository.name }}.zip main.js manifest.json styles.css README.md
@@ -31,7 +35,7 @@ jobs:
     - name: Release
       uses: softprops/action-gh-release@v3
       with:
-        tag_name: ${{ github.event_name == 'workflow_dispatch' && format('test-{0}', github.run_id) || github.ref_name }}
+        tag_name: ${{ github.event_name == 'workflow_dispatch' && format('test-{0}-{1}', github.run_id, steps.random.outputs.suffix) || format('{0}-{1}', github.ref_name, steps.random.outputs.suffix) }}
         generate_release_notes: true
         files: |
           ${{ github.event.repository.name }}.zip
