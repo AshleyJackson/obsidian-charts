@@ -316,7 +316,9 @@ class ChartRenderChild extends MarkdownRenderChild {
         if (!fileCache) {
           throw new Error("Cache not found");
         }
-        const pos = fileCache.sections?.find((pre: any) => pre.id === this.data.id)?.position;
+        // Strip leading ^ from block ID if present (used in link syntax but not stored in cache)
+        const blockId = this.data.id.startsWith('^') ? this.data.id.slice(1) : this.data.id;
+        const pos = fileCache.sections?.find((pre: any) => pre.id === blockId)?.position;
         if (!pos) {
           throw new Error("Invalid id and/or file");
         }
