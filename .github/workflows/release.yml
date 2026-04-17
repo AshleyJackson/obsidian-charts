@@ -38,5 +38,5 @@ jobs:
           main.js
           manifest.json
           styles.css
-        draft: ${{ github.event_name == 'workflow_dispatch' }}
+        draft: false
         prerelease: ${{ github.event_name == 'workflow_dispatch' }}
