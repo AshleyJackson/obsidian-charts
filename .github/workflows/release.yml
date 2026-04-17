@@ -77,11 +77,15 @@ jobs:
 
     - name: Get version from package.json
       id: pkg-version
-      run: echo "version=$(grep '"version"' package.json | head -1 | sed 's/.*"version": *"\([^"]*\)".*/\1/')" >> $GITHUB_OUTPUT
+      run: |
+        VERSION=$(grep '"version"' package.json | head -1 | sed 's/.*"version": *"\([^"]*\)".*/\1/')
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
 
     - name: Generate random suffix
       id: random
-      run: echo "suffix=$(head /dev/urandom | LC_ALL=C tr -dc 'a-z0-9' | head -c 8)" >> $GITHUB_OUTPUT
+      run: |
+        SUFFIX=$(head /dev/urandom | LC_ALL=C tr -dc 'a-z0-9' | head -c 8)
+        echo "suffix=$SUFFIX" >> $GITHUB_OUTPUT
 
     - name: Package zip
       run: |
