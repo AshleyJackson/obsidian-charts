@@ -54,7 +54,7 @@ The `fill` Modifier is used in Line Charts to fill the Area under the Traces.
 
 ## `bestFit` Modifiers
 
-The `bestFit` Modifier is used in Line Charts to generate a line of best fit for the given line.
+The `bestFit` Modifier is used in Line Charts to generate a line of best fit using linear regression. The regression is computed against index positions (0, 1, 2, ...) as the X values and your data values as the Y values.
 
 - Expected: `boolean` (`true` or `false`)
 - Default: `false`
@@ -64,7 +64,7 @@ The `bestFitTitle` Optional modifier is used with `bestFit` to specify a title f
 - Expected: `string`
 - Default: `Line of Best Fit`
 
-The `bestFitNumber` Optional modifier is used with the `bestFit` modifier to specify a line for `bestFit` to use.
+The `bestFitNumber` Optional modifier is used with the `bestFit` modifier to specify which series to compute the best fit line for.
 
 - Expected: `integer` (`0` for the first line, `1` for the second line, ...)
 - Default: `0`
@@ -265,3 +265,53 @@ You can override the inner color of your Chart's elements using the `transparenc
 
 - Expected: `float` (`0.0` - `1.0`)
 - Default: `0.25`
+
+## `stepped` Modifier
+
+The `stepped` Modifier is used in Line Charts to render the line in a stepped fashion. When enabled, the line will render as a staircase rather than a smooth or straight diagonal between points.
+
+- Expected: `boolean` (`true` or `false`) or `string` (`'before'`, `'after'`, `'middle'`)
+- Default: `false`
+
+### Example
+
+````yaml
+```chart
+    type: line
+    labels: [Monday,Tuesday,Wednesday,Thursday,Friday]
+    series:
+        - title: Title 1
+        data: [1,2,3,4,5]
+        - title: Title 2
+        data: [5,4,3,2,1]
+    stepped: true
+```
+````
+
+## `labelColors` Modifier
+
+The `labelColors` Modifier is used to assign colors based on labels instead of series. This is most useful for Pie, Doughnut, and Polar Area Charts.
+
+- Expected: `boolean` (`true` or `false`)
+- Default: `false`
+
+## `padding` Modifier
+
+The `padding` Modifier adds padding around the chart.
+
+- Expected: `integer` or `object`
+- Default: none
+
+## `textColor` Modifier
+
+The `textColor` Modifier overrides the text color for chart labels and legends.
+
+- Expected: `string` (CSS color value)
+- Default: Obsidian's `--text-muted` CSS variable
+
+## `rMin` and `rMax` Modifiers
+
+Set the minimum and maximum values for the radial axis in Radar and Polar Area Charts.
+
+- Expected: `number`
+- Default: automatic

@@ -19,6 +19,12 @@ To create a Chart within Obsidian a Codeblock of the type `chart` is used. The P
 
 The `title` Property _can_ be omitted, but it is not advised to do so.
 
+:::info Numeric Data Values
+
+Data values in the `data` arrays are automatically converted to numbers. If YAML parses a value as a string (e.g., `"5"` instead of `5`), the plugin will convert it before rendering. You can write values as either numbers or strings and they will work correctly.
+
+:::
+
 :::caution
 
 You might **not** be able to copy the Examples directly into Obsidian, the Indentation is probably wrong and Obsidian tries to convert pasted Text to Markdown, which escapes a few important characters.

@@ -37,6 +37,62 @@
 4. Choose the column or row oriented layout using the `layout` attribute. Options are `rows` or `columns`.
 5. (Optional) Select the Columns or Rows with the `select` attribute. E.g. to only show Row `Data2` add `select: [Data2]`
 
+:::tip Block ID Format
+
+You can use either `^my-table` or `my-table` as the `id` value. The plugin automatically strips the leading `^` when looking up the block ID in Obsidian's cache.
+
+:::
+
+:::info Block IDs Hidden in Reading Mode
+
+When a table has a block ID (e.g., `^table`) for chart linking, the block ID link that normally appears below the table is automatically hidden in reading mode. This keeps your notes clean while still allowing the chart-table link to work.
+
+:::
+
+## Date Auto-Transpose
+
+*Introduced in Version 3.6.0*
+
+When your table has date-like values in the first column or row (depending on layout), the plugin automatically transposes the data for proper time series display.
+
+**Without auto-transpose**, dates would become series names, resulting in multiple lines instead of a single time series.
+
+**With auto-transpose**, dates become X-axis labels and the original column headers become series names.
+
+### Supported Date Formats
+
+The following date formats are automatically detected:
+
+- ISO format: `2026-03-17`
+- US format: `03/17/2026`, `3/17/2026`
+- European format: `17/03/2026`, `17-03-2026`
+- And other common international formats
+
+### Example
+
+Given this table:
+
+```md
+| Date       | Sales | Revenue |
+| ---------- | ----- | ------- |
+| 2026-01-01 | 100   | 500     |
+| 2026-02-01 | 150   | 750     |
+| 2026-03-01 | 120   | 600     |
+^sales-table
+```
+
+With `layout: rows`, the auto-transpose will automatically make the dates the X-axis labels and "Sales"/"Revenue" the series:
+
+````md
+```chart
+type: line
+id: ^sales-table
+layout: rows
+```
+````
+
+The transposition triggers when the majority (>50%) of field keys are date-like. This threshold prevents false positives on tables that happen to have one date-like header among many non-date headers.
+
 ## Replace Table with Chart
 
 You can select a whole Markdown-Table and run the Command "Create Chart from Table" to replace it with a Chart.

@@ -51,6 +51,27 @@ Date detection uses **Luxon** library (`DateTime.fromISO()` and `DateTime.fromFo
 ### Block ID Linking
 Charts can link to tables using block IDs. The ID format uses `^` prefix in YAML (e.g., `id: ^my-table`) but Obsidian's cache stores IDs without the prefix. The code strips the leading `^` when searching `fileCache.sections`.
 
+Block IDs that follow tables in reading mode are automatically hidden via CSS in `styles.css`. This prevents the `^table-id` link from being visually disruptive below linked tables.
+
+### Stepped Line Modifier
+The `stepped` modifier is supported in line and bar charts. When set, it renders the line in a stepped fashion (before/after/middle) per Chart.js's `stepped` option. The property is passed through from YAML to the dataset configuration in both standalone charts and table-linked charts.
+
+### Best Fit Line
+The `bestFit` modifier computes a linear regression line of best fit for line charts. It is processed in the postprocessor (`main.ts`) before rendering:
+- `bestFit: true` - Enables best fit line (defaults to line index 0)
+- `bestFitNumber: <int>` - Selects which series to compute best fit for (0-indexed)
+- `bestFitTitle: <string>` - Custom title for the best fit series (default: "Line of Best Fit")
+- Computation uses linear regression: `y = gradient * i + intercept`
+
+### String Data Auto-Conversion
+YAML parsing can return numeric values as strings (e.g., `"5"` instead of `5`). Both `datasetPrep()` and the table-linked chart path in `ChartRenderChild.onload()` automatically convert string data values to numbers using `parseFloat()`. This ensures chart rendering works correctly regardless of YAML input format.
+
+### Canvas Dimensions for Image Export
+The `imageRenderer()` method respects the `width` property from YAML when generating chart images. It parses pixel values (`600px`), numeric values (`600`), and rejects percentage values (falls back to default `600px`). The height is calculated at a 2:1 aspect ratio. Previously, canvas dimensions were not set from YAML, resulting in default/small image exports.
+
+### Debounced Chart Reload
+`ChartRenderChild` uses a debounced reload mechanism (500ms) when metadata changes are detected for linked charts. This prevents rapid successive reloads when a file is being edited, which could cause rendering issues or performance problems. The debounce timer is properly cleaned up in `onunload()`.
+
 ## Testing Architecture
 
 ### Module Mocking Strategy
@@ -112,18 +133,26 @@ Tests the main plugin class:
 - Plugin initialization and settings loading
 - Postprocessor registration
 - Command registration
+- Best fit line computation (linear regression)
+- Best fit with custom title and line number selection
+- Best fit with string data values (auto-conversion to numbers)
 
 ### chartRenderer.test.ts
 Tests chart rendering:
 - `datasetPrep()` - Prepares chart data from YAML
 - `renderRaw()` - Renders chart to DOM element
 - `imageRenderer()` - Generates image from chart
+- String data auto-conversion to numbers
+- `stepped` property passed through to datasets
+- Canvas dimensions set from YAML width property
+- Debounced reload on metadata changes
 
 ### chartFromTable.test.ts
 Tests table-to-chart conversion:
 - `chartFromTable()` - Converts selected table to chart code
 - `generateTableData()` - Parses markdown table to data
 - **Date auto-transpose** - Detects date fields and transposes for time series
+- Block ID lookup with leading `^` prefix handling
 
 ## Key Mock Implementations
 
@@ -247,3 +276,8 @@ it('parses European date format DD-MM-YYYY', () => {
 5. **Block IDs** - Strip `^` prefix when searching Obsidian's fileCache.sections
 6. **ESM modules need mocking** - The date-adapter uses ESM imports from obsidian
 7. **Always update tests** - When adding features, add corresponding tests in the same session
+8. **String data values** - YAML may parse numbers as strings; code auto-converts via `parseFloat()`
+9. **Debounced reload** - Chart reload on metadata change uses 500ms debounce; timer must be cleaned up in `onunload()`
+10. **Canvas dimensions** - Image export respects YAML `width` property; percentage widths default to 600px for images
+11. **Best fit computation** - Uses linear regression on index positions (i) vs data values (y); computed in postprocessor before rendering
+12. **Stepped modifier** - Passed directly to Chart.js dataset; valid for line and bar chart types

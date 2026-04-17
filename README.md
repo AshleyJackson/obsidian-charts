@@ -5,6 +5,19 @@ This plugin lets you create interactive Charts in
 
 **[Read the Documentation](https://charts.phib.ro/)**
 
+## Features
+
+- Create charts using YAML code blocks with `chart` type
+- Support for Bar, Line, Radar, Doughnut, Pie, Polar Area, and Sankey chart types
+- Link charts to Markdown tables via block IDs for live data
+- Date auto-transpose: tables with date-like keys automatically display as time series
+- Best fit line computation using linear regression
+- Stepped line modifier for staircase-style line charts
+- Graphical chart creator via Command Palette
+- Create images from charts
+- Dataview integration via `window.renderChart()`
+- Customizable colors and theming via CSS variables
+
 ## How to install
 
 1. Go to **Community Plugins** in your [Obsidian](https://www.obsidian.md)
