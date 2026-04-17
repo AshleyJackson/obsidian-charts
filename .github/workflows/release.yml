@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - master
-    paths:
-      - 'package.json'
 jobs:
   check-release-needed:
     if: github.event_name == 'push'
