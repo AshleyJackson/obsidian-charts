@@ -48,7 +48,7 @@ export function generateTableData(table: string, layout: 'columns' | 'rows', sel
 
   if(selected) {
     console.log('Charts: Filtering by selected fields:', selected);
-    dataFields = dataFields.filter(value => selected.contains(value.dataTitle));
+    dataFields = dataFields.filter(value => selected.includes(value.dataTitle));
   }
 
   return {labels, dataFields};

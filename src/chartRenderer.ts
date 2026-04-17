@@ -10,10 +10,6 @@ import annotationPlugin from 'chartjs-plugin-annotation'
 
 Chart.register(...registerables, annotationPlugin, SankeyController, Flow);
 
-// I need to refactor this
-// Or just rewrite it completely
-// It's a mess
-
 export default class Renderer {
     plugin: ChartPlugin;
 
@@ -23,9 +19,9 @@ export default class Renderer {
 
   async datasetPrep(yaml: any, el: HTMLElement, themeColors = false): Promise<{ chartOptions: ChartConfiguration; width: string; }> {
     console.log('Charts: Preparing dataset for type:', yaml.type, 'with series count:', yaml.series?.length || 0);
-    let datasets = [];
+    let datasets: any[] = [];
     if (!yaml.id) {
-      const colors = [];
+      const colors: string[] = [];
       if (this.plugin.settings.themeable || themeColors) {
         let i = 1;
         while (true) {
@@ -53,10 +49,10 @@ export default class Renderer {
         if (yaml.type === 'sankey') {
           // colorFrom, colorTo is accepted as object in yaml, but should be function for sankey.
           if (dataset.colorFrom)
-            (dataset as SankeyControllerDatasetOptions).colorFrom = (c) => yaml.series[i].colorFrom[c.dataset.data[c.dataIndex].from] ?? colors[i] ?? 'green'
+            (dataset as SankeyControllerDatasetOptions).colorFrom = (c: any) => yaml.series[i].colorFrom?.[c.dataset.data[c.dataIndex].from] ?? colors[i] ?? 'green'
             
           if (dataset.colorTo)
-            (dataset as SankeyControllerDatasetOptions).colorTo = (c) => yaml.series[i].colorTo[c.dataset.data[c.dataIndex].to] ?? colors[i] ?? 'green'
+            (dataset as SankeyControllerDatasetOptions).colorTo = (c: any) => yaml.series[i].colorTo?.[c.dataset.data[c.dataIndex].to] ?? colors[i] ?? 'green'
             
         }
         datasets.push(dataset);
@@ -220,12 +216,13 @@ export default class Renderer {
     console.log('Charts: Starting image renderer for format:', options.format, 'quality:', options.quality);
     const delay = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
     const destination = document.createElement('canvas');
-    const destinationContext = destination.getContext("2d");
+    const destinationContext = destination.getContext("2d")!;
 
-    const chartOptions = await this.datasetPrep(await parseYaml(yaml.replace("```chart", "").replace("```", "").replace(/\t/g, '    ')), document.body);
+    const parsedYaml = await parseYaml(yaml.replace("```chart", "").replace("```", "").replace(/\t/g, '    '));
+    const chartOptions = await this.datasetPrep(parsedYaml, document.body);
     console.log('Charts: Prepared options for image');
 
-    new Chart(destinationContext, chartOptions.chartOptions);
+    const chart = new Chart(destinationContext, chartOptions.chartOptions);
 
     document.body.append(destination);
     await delay(250);
@@ -242,9 +239,9 @@ export default class Renderer {
 
     if (data.chartOptions) {
       try {
-        let chart = new Chart(destination.getContext("2d"), data.chartOptions);
-        destination.parentElement.style.width = data.width ?? "100%";
-        destination.parentElement.style.margin = "auto";
+        let chart = new Chart(destination.getContext("2d")!, data.chartOptions);
+        destination.parentElement!.style.width = data.width ?? "100%";
+        destination.parentElement!.style.margin = "auto";
         console.log('Charts: Raw chart rendered successfully with options');
         return chart;
       } catch (error) {
@@ -254,7 +251,7 @@ export default class Renderer {
       }
     } else {
       try {
-        let chart = new Chart(destination.getContext("2d"), data);
+        let chart = new Chart(destination.getContext("2d")!, data);
         console.log('Charts: Raw chart rendered successfully with raw data');
         return chart;
       } catch (error) {
@@ -272,7 +269,7 @@ export default class Renderer {
 
 class ChartRenderChild extends MarkdownRenderChild {
     data: any;
-    chart: null | Chart;
+    chart: Chart | null = null;
     renderer: Renderer;
     ownPath: string;
     el: HTMLElement;
@@ -283,19 +280,17 @@ class ChartRenderChild extends MarkdownRenderChild {
         this.data = data;
         this.renderer = renderer;
         this.ownPath = ownPath;
-        this.changeHandler = this.changeHandler.bind(this);
-        this.reload = this.reload.bind(this);
     }
 
   async onload() {
     console.log('Charts: Loading chart render child for data:', this.data);
     try {
-      const data = await this.renderer.datasetPrep(this.data, this.el);
-      console.log('Charts: Prepared dataset:', data);
-      let x: any = {};
+      const preparedData = await this.renderer.datasetPrep(this.data, this.el);
+      console.log('Charts: Prepared dataset:', preparedData);
+      let chartData: any = { ...preparedData.chartOptions.data };
       if (this.data.id) {
         console.log('Charts: Processing linked chart with id:', this.data.id);
-        const colors = [];
+        const colors: string[] = [];
         if (this.renderer.plugin.settings.themeable) {
           let i = 1;
           while (true) {
@@ -308,28 +303,38 @@ class ChartRenderChild extends MarkdownRenderChild {
             }
           }
         }
-        x.datasets = [];
-        let linkDest: TFile;
-        if (this.data.file) linkDest = this.renderer.plugin.app.metadataCache.getFirstLinkpathDest(this.data.file, this.renderer.plugin.app.workspace.getActiveFile().path);
-        const pos = this.renderer.plugin.app.metadataCache.getFileCache(
-          linkDest ?? this.renderer.plugin.app.vault.getAbstractFileByPath(this.ownPath) as TFile).sections.find(pre => pre.id === this.data.id)?.position;
+        chartData.datasets = [];
+        let linkDest: TFile | undefined;
+        if (this.data.file) {
+          linkDest = this.renderer.plugin.app.metadataCache.getFirstLinkpathDest(this.data.file, this.renderer.plugin.app.workspace.getActiveFile()?.path);
+        }
+        const currentFile = linkDest ?? (this.renderer.plugin.app.vault.getAbstractFileByPath(this.ownPath) as TFile | undefined);
+        if (!currentFile) {
+          throw new Error("File not found");
+        }
+        const fileCache = this.renderer.plugin.app.metadataCache.getFileCache(currentFile);
+        if (!fileCache) {
+          throw new Error("Cache not found");
+        }
+        const pos = fileCache.sections?.find((pre: any) => pre.id === this.data.id)?.position;
         if (!pos) {
-          throw "Invalid id and/or file";
+          throw new Error("Invalid id and/or file");
         }
 
-        const tableString = (await this.renderer.plugin.app.vault.cachedRead(this.data.file ? linkDest : this.renderer.plugin.app.vault.getAbstractFileByPath(this.ownPath) as TFile)).substring(pos.start.offset, pos.end.offset);
+        const fileContent = await this.renderer.plugin.app.vault.cachedRead(currentFile);
+        const tableString = fileContent.substring(pos.start.offset, pos.end.offset);
         console.log('Charts: Extracted table string length:', tableString.length);
-        let tableData;
+        let tableData: any;
         try {
           tableData = generateTableData(tableString, this.data.layout ?? 'columns', this.data.select);
           console.log('Charts: Generated table data:', tableData);
         } catch (error) {
           console.error('Charts: Error generating table data:', error);
-          throw "There is no table at that id and/or file"
+          throw new Error("There is no table at that id and/or file");
         }
-        x.labels = tableData.labels;
+        chartData.labels = tableData.labels;
         for (let i = 0; tableData.dataFields.length > i; i++) {
-          x.datasets.push({
+          chartData.datasets.push({
             label: tableData.dataFields[i].dataTitle ?? "",
             data: tableData.dataFields[i].data,
             backgroundColor: this.data.labelColors ? colors.length ? generateInnerColors(colors, this.data.transparency) : generateInnerColors(this.renderer.plugin.settings.colors, this.data.transparency) : colors.length ? generateInnerColors(colors, this.data.transparency)[i] : generateInnerColors(this.renderer.plugin.settings.colors, this.data.transparency)[i],
@@ -339,83 +344,24 @@ class ChartRenderChild extends MarkdownRenderChild {
             tension: this.data.tension ?? 0,
           });
         }
-        data.chartOptions.data.labels = x.labels;
-        data.chartOptions.data.datasets = x.datasets;
+        preparedData.chartOptions.data = chartData;
         console.log('Charts: Updated chart options with table data');
-
-
       }
-      this.chart = this.renderer.renderRaw(data, this.el);
+      this.chart = this.renderer.renderRaw(preparedData, this.el);
       console.log('Charts: Rendered chart successfully');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Charts: Error in onload:', error);
       renderError(error, this.el);
     }
     if (this.data.id) {
       console.log('Charts: Registering change handler for linked chart');
-      this.renderer.plugin.app.metadataCache.on("changed", this.changeHandler);
+      this.renderer.plugin.app.metadataCache.on("changed", this.handleChange.bind(this));
     }
-    this.renderer.plugin.app.workspace.on('css-change', this.reload);
+    this.renderer.plugin.app.workspace.on('css-change', this.handleReload.bind(this));
     console.log('Charts: Registered event listeners');
   }
-                    }
-                }
-                x.datasets = [];
-                let linkDest: TFile;
-                if (this.data.file) linkDest = this.renderer.plugin.app.metadataCache.getFirstLinkpathDest(this.data.file, this.renderer.plugin.app.workspace.getActiveFile().path);
-                const pos = this.renderer.plugin.app.metadataCache.getFileCache(
-                    linkDest ?? this.renderer.plugin.app.vault.getAbstractFileByPath(this.ownPath) as TFile).sections.find(pre => pre.id === this.data.id)?.position;
-                if (!pos) {
-                    throw "Invalid id and/or file";
-                }
 
-                const tableString = (await this.renderer.plugin.app.vault.cachedRead(this.data.file ? linkDest : this.renderer.plugin.app.vault.getAbstractFileByPath(this.ownPath) as TFile)).substring(pos.start.offset, pos.end.offset);
-                let tableData;
-                try {
-                    tableData = generateTableData(tableString, this.data.layout ?? 'columns', this.data.select);
-                } catch (error) {
-                    throw "There is no table at that id and/or file"
-                }
-                x.labels = tableData.labels;
-                for (let i = 0; tableData.dataFields.length > i; i++) {
-                    x.datasets.push({
-                        label: tableData.dataFields[i].dataTitle ?? "",
-                        data: tableData.dataFields[i].data,
-                        backgroundColor: this.data.labelColors ? colors.length ? generateInnerColors(colors, this.data.transparency) : generateInnerColors(this.renderer.plugin.settings.colors, this.data.transparency) : colors.length ? generateInnerColors(colors, this.data.transparency)[i] : generateInnerColors(this.renderer.plugin.settings.colors, this.data.transparency)[i],
-                        borderColor: this.data.labelColors ? colors.length ? colors : this.renderer.plugin.settings.colors : colors.length ? colors[i] : this.renderer.plugin.settings.colors[i],
-                        borderWidth: 1,
-                        fill: this.data.fill ? this.data.stacked ? i == 0 ? 'origin' : '-1' : true : false,
-                        tension: this.data.tension ?? 0,
-                    });
-                }
-                data.chartOptions.data.labels = x.labels;
-                data.chartOptions.data.datasets = x.datasets;
-
-
-            }
-            this.chart = this.renderer.renderRaw(data, this.containerEl);
-        } catch (error) {
-            renderError(error, this.el);
-        }
-        if (this.data.id) {
-            this.renderer.plugin.app.metadataCache.on("changed", this.changeHandler);
-        }
-        this.renderer.plugin.app.workspace.on('css-change', this.reload);
-    }
-
-    changeHandler(file: TFile) {
-        if (this.data.file ? file.basename === this.data.file : file.path === this.ownPath) {
-            this.reload();
-        }
-    }
-
-  reload() {
-    console.log('Charts: Reloading chart');
-    this.onunload();
-    this.onload();
-  }
-
-  changeHandler(file: TFile) {
+  private handleChange(file: TFile) {
     console.log('Charts: Metadata changed for file:', file.path);
     if (this.data.file ? file.basename === this.data.file : file.path === this.ownPath) {
       console.log('Charts: Reloading due to relevant file change');
@@ -423,12 +369,24 @@ class ChartRenderChild extends MarkdownRenderChild {
     }
   }
 
+  private handleReload() {
+    console.log('Charts: Reloading chart');
+    this.onunload();
+    this.onload();
+  }
+
+  private reload() {
+    this.handleReload();
+  }
+
   onunload() {
     console.log('Charts: Unloading chart render child');
-    this.renderer.plugin.app.metadataCache.off("changed", this.changeHandler);
-    this.renderer.plugin.app.workspace.off('css-change', this.reload);
+    this.renderer.plugin.app.metadataCache.off("changed", this.handleChange.bind(this));
+    this.renderer.plugin.app.workspace.off('css-change', this.handleReload.bind(this));
     this.el.empty();
-    this.chart && this.chart.destroy();
-    this.chart = null;
+    if (this.chart) {
+      this.chart.destroy();
+      this.chart = null;
+    }
   }
 }
