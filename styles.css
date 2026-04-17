@@ -28,29 +28,3 @@ a[href="https://ko-fi.com/phibr0"] > img
 {
   height: 3em;
 }
-
-/* Chart resize handle */
-.chart-container {
-  position: relative;
-  display: inline-block;
-  max-width: 100%;
-}
-
-.chart-resize-handle {
-  position: absolute;
-  right: 0;
-  top: 0;
-  bottom: 0;
-  width: 8px;
-  cursor: ew-resize;
-  background: transparent;
-  transition: background 0.2s ease;
-}
-
-.chart-resize-handle:hover {
-  background: linear-gradient(to right, transparent, var(--interactive-accent, #7c3aed));
-}
-
-.chart-container.chart-resizing .chart-resize-handle {
-  background: var(--interactive-accent, #7c3aed);
-}
