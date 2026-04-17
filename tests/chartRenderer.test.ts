@@ -198,6 +198,119 @@ describe('Renderer', () => {
     });
   });
 
+  describe('ChartRenderChild debounce', () => {
+    let child: any;
+    let mockContainerEl: HTMLElement;
+
+    beforeEach(() => {
+      mockContainerEl = document.createElement('div');
+      document.body.appendChild(mockContainerEl);
+
+      const mockApp = {
+        metadataCache: {
+          on: jest.fn(),
+          off: jest.fn(),
+          getFileCache: jest.fn(),
+        },
+        workspace: {
+          on: jest.fn(),
+          off: jest.fn(),
+          getActiveFile: jest.fn(),
+        },
+        vault: {
+          getAbstractFileByPath: jest.fn(),
+          cachedRead: jest.fn(),
+        },
+      };
+      const plugin = { settings: { colors: ['#ff0000', '#00ff00'], themeable: false }, app: mockApp };
+      const testRenderer = new Renderer(plugin as any);
+
+      // Import ChartRenderChild indirectly by creating it through the exported createChartRenderChild
+      // Since ChartRenderChild is not exported, we test via the module internals
+      const { ChartRenderChild } = require('../src/chartRenderer') as any;
+      child = new ChartRenderChild(
+        { type: 'bar', labels: ['A', 'B'], series: [{ title: 'S1', data: [1, 2] }] },
+        mockContainerEl,
+        testRenderer,
+        'test.md'
+      );
+    });
+
+    afterEach(() => {
+      if (child) {
+        child.onunload();
+      }
+      document.body.removeChild(mockContainerEl);
+      jest.useRealTimers();
+    });
+
+    it('debounces reload on handleChange - only one reload after 500ms', () => {
+      jest.useFakeTimers();
+      const reloadSpy = jest.spyOn(child, 'handleReload');
+
+      // Simulate rapid metadata changes (typing)
+      child.handleChange({ path: 'test.md', basename: 'test' });
+      child.handleChange({ path: 'test.md', basename: 'test' });
+      child.handleChange({ path: 'test.md', basename: 'test' });
+
+      // No reload yet
+      expect(reloadSpy).not.toHaveBeenCalled();
+
+      // After 500ms, only one reload
+      jest.advanceTimersByTime(500);
+      expect(reloadSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('resets debounce timer on each handleChange', () => {
+      jest.useFakeTimers();
+      const reloadSpy = jest.spyOn(child, 'handleReload');
+
+      child.handleChange({ path: 'test.md', basename: 'test' });
+      jest.advanceTimersByTime(300);
+
+      // Second change resets the timer
+      child.handleChange({ path: 'test.md', basename: 'test' });
+      jest.advanceTimersByTime(300);
+
+      // Still no reload - 300ms since last change
+      expect(reloadSpy).not.toHaveBeenCalled();
+
+      jest.advanceTimersByTime(200);
+      expect(reloadSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('clears pending reload timer on onunload', () => {
+      jest.useFakeTimers();
+      const reloadSpy = jest.spyOn(child, 'handleReload');
+
+      child.handleChange({ path: 'test.md', basename: 'test' });
+      child.onunload();
+
+      jest.advanceTimersByTime(600);
+      expect(reloadSpy).not.toHaveBeenCalled();
+    });
+
+    it('ignores handleChange for unrelated files', () => {
+      jest.useFakeTimers();
+      const reloadSpy = jest.spyOn(child, 'handleReload');
+
+      child.handleChange({ path: 'other.md', basename: 'other' });
+      jest.advanceTimersByTime(600);
+
+      expect(reloadSpy).not.toHaveBeenCalled();
+    });
+
+    it('uses bound handler references for proper event unregistration', () => {
+      child.onunload();
+      const { metadataCache } = child.renderer.plugin.app;
+      const { workspace } = child.renderer.plugin.app;
+
+      // Verify off() was called with the bound references
+      expect(metadataCache.off).toHaveBeenCalledWith('changed', child.boundHandleChange);
+      expect(workspace.off).toHaveBeenCalledWith('css-change', child.boundHandleReload);
+    });
+  });
+
   describe('imageRenderer', () => {
     it('generates image data URL', async () => {
       const yaml = '```chart\ntype: bar\nlabels: []\nseries: []\n```';

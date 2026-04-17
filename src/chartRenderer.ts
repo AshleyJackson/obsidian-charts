@@ -291,12 +291,15 @@ export default class Renderer {
     }
 }
 
-class ChartRenderChild extends MarkdownRenderChild {
+export class ChartRenderChild extends MarkdownRenderChild {
     data: any;
     chart: Chart | null = null;
     renderer: Renderer;
     ownPath: string;
     el: HTMLElement;
+    private reloadTimer: ReturnType<typeof setTimeout> | null = null;
+    private boundHandleChange: (file: TFile) => void;
+    private boundHandleReload: () => void;
 
     constructor(data: any, el: HTMLElement, renderer: Renderer, ownPath: string) {
         super(el);
@@ -304,6 +307,8 @@ class ChartRenderChild extends MarkdownRenderChild {
         this.data = data;
         this.renderer = renderer;
         this.ownPath = ownPath;
+        this.boundHandleChange = this.handleChange.bind(this);
+        this.boundHandleReload = this.debouncedReload.bind(this);
     }
 
   async onload() {
@@ -393,9 +398,19 @@ class ChartRenderChild extends MarkdownRenderChild {
   private handleChange(file: TFile) {
     console.log('Charts: Metadata changed for file:', file.path);
     if (this.data.file ? file.basename === this.data.file : file.path === this.ownPath) {
-      console.log('Charts: Reloading due to relevant file change');
-      this.reload();
+      console.log('Charts: Scheduling reload due to relevant file change');
+      this.debouncedReload();
     }
+  }
+
+  private debouncedReload() {
+    if (this.reloadTimer) {
+      clearTimeout(this.reloadTimer);
+    }
+    this.reloadTimer = setTimeout(() => {
+      this.reloadTimer = null;
+      this.handleReload();
+    }, 500);
   }
 
   private handleReload() {
@@ -410,8 +425,12 @@ class ChartRenderChild extends MarkdownRenderChild {
 
   onunload() {
     console.log('Charts: Unloading chart render child');
-    this.renderer.plugin.app.metadataCache.off("changed", this.handleChange.bind(this));
-    this.renderer.plugin.app.workspace.off('css-change', this.handleReload.bind(this));
+    if (this.reloadTimer) {
+      clearTimeout(this.reloadTimer);
+      this.reloadTimer = null;
+    }
+    this.renderer.plugin.app.metadataCache.off("changed", this.boundHandleChange);
+    this.renderer.plugin.app.workspace.off('css-change', this.boundHandleReload);
     this.el.empty();
     if (this.chart) {
       this.chart.destroy();
