@@ -2,8 +2,8 @@ name: Release Obsidian Plugin
 on:
   workflow_dispatch:
   push:
-    tags:
-      - '*'
+    branches:
+      - master
 jobs:
   release:
     permissions:

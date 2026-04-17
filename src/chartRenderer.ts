@@ -248,7 +248,7 @@ export default class Renderer {
         console.log('Charts: Raw chart rendered successfully with options');
         return chart;
       } catch (error) {
-        console.error('Charts: Error rendering chart with options:', error);
+        console.error('Charts: Chart failed to load with options. Data:', data, 'Error:', error);
         renderError(error, el);
         return null;
       }
@@ -258,7 +258,7 @@ export default class Renderer {
         console.log('Charts: Raw chart rendered successfully with raw data');
         return chart;
       } catch (error) {
-        console.error('Charts: Error rendering chart with raw data:', error);
+        console.error('Charts: Chart failed to load with raw data. Data:', data, 'Error:', error);
         renderError(error, el);
         return null;
       }
