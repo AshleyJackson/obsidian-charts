@@ -223,6 +223,25 @@ export default class Renderer {
     const chartOptions = await this.datasetPrep(parsedYaml, document.body);
     console.log('Charts: Prepared options for image');
 
+    // Set canvas dimensions - use width from YAML or default to 600px
+    // Width can be percentage or pixels, for image we need pixels
+    let width = 600;
+    if (parsedYaml.width) {
+      if (typeof parsedYaml.width === 'string' && parsedYaml.width.endsWith('px')) {
+        width = parseInt(parsedYaml.width);
+      } else if (typeof parsedYaml.width === 'number') {
+        width = parsedYaml.width;
+      } else if (typeof parsedYaml.width === 'string' && !parsedYaml.width.endsWith('%')) {
+        width = parseInt(parsedYaml.width);
+      }
+    }
+    // Default aspect ratio for charts (width:height = 2:1)
+    const height = Math.round(width / 2);
+    
+    destination.width = width;
+    destination.height = height;
+    console.log('Charts: Canvas dimensions set to', width, 'x', height);
+
     const chart = new Chart(destinationContext, chartOptions.chartOptions);
 
     document.body.append(destination);
