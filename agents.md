@@ -176,6 +176,49 @@ const registerables = []; // Empty for testing
 5. Create additional mocks in `__mocks__/` for new dependencies
 6. **Always update tests when adding new features** - test coverage is mandatory
 
+## Testing Requirements for Changes
+
+**CRITICAL: Every feature or bug fix MUST include corresponding tests.**
+
+When modifying any source file, you MUST:
+1. **Add tests for new functionality** - Verify the feature works correctly
+2. **Add regression tests for bug fixes** - Ensure the bug doesn't reoccur
+3. **Test edge cases** - Null values, empty arrays, boundary conditions, error states
+4. **Update existing tests if behavior changes** - Don't break existing test coverage
+
+### Test File Mapping
+
+| Source File | Test File |
+|-------------|-----------|
+| `src/main.ts` | `tests/main.test.ts` |
+| `src/chartRenderer.ts` | `tests/chartRenderer.test.ts` |
+| `src/chartFromTable.ts` | `tests/chartFromTable.test.ts` |
+| `src/util.ts` | Add tests to relevant test file |
+
+### Example: Adding a New Dataset Property
+
+If adding `stepped` property support for table-linked charts:
+```typescript
+// Add to chartRenderer.test.ts
+describe('ChartRenderChild', () => {
+  it('applies stepped property to table-linked datasets', () => {
+    // Test the stepped property is passed through
+  });
+});
+```
+
+### Example: Bug Fix for Date Parsing
+
+If fixing a date parsing bug:
+```typescript
+// Add to chartFromTable.test.ts
+it('parses European date format DD-MM-YYYY', () => {
+  const table = '| Date | Value |\n|------|-------|\n| 17-03-2026 | 5 |';
+  const result = generateTableData(table, 'rows');
+  expect(result.labels).toContain('17-03-2026');
+});
+```
+
 ## Dependencies
 
 **Production:**

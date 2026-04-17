@@ -44,6 +44,7 @@ export default class Renderer {
           borderWidth: 1,
           fill: yaml.fill ? yaml.stacked ? i == 0 ? 'origin' : '-1' : true : false, //See https://github.com/phibr0/obsidian-charts/issues/53#issuecomment-1084869550
           tension: yaml.tension ?? 0,
+          stepped: yaml.stepped,
           ...rest,
         };
         if (yaml.type === 'sankey') {
@@ -344,6 +345,7 @@ class ChartRenderChild extends MarkdownRenderChild {
             borderWidth: 1,
             fill: this.data.fill ? this.data.stacked ? i == 0 ? 'origin' : '-1' : true : false,
             tension: this.data.tension ?? 0,
+            stepped: this.data.stepped,
           });
         }
         preparedData.chartOptions.data = chartData;

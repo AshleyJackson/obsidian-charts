@@ -95,6 +95,58 @@ describe('Renderer', () => {
       const yaml = { type: 'invalid' };
       await expect(renderer.datasetPrep(yaml as any, mockEl)).rejects.not.toBeNull();
     });
+
+    it('passes stepped property to line chart dataset', async () => {
+      const yaml = {
+        type: 'line',
+        labels: ['A', 'B'],
+        series: [{ title: 'S1', data: [1, 2] }],
+        stepped: true
+      };
+
+      const result = await renderer.datasetPrep(yaml, mockEl);
+
+      expect(result.chartOptions.data.datasets[0].stepped).toBe(true);
+    });
+
+    it('passes tension property to dataset', async () => {
+      const yaml = {
+        type: 'line',
+        labels: ['A', 'B'],
+        series: [{ title: 'S1', data: [1, 2] }],
+        tension: 0.5
+      };
+
+      const result = await renderer.datasetPrep(yaml, mockEl);
+
+      expect(result.chartOptions.data.datasets[0].tension).toBe(0.5);
+    });
+
+    it('passes fill property to dataset', async () => {
+      const yaml = {
+        type: 'line',
+        labels: ['A', 'B'],
+        series: [{ title: 'S1', data: [1, 2] }],
+        fill: true
+      };
+
+      const result = await renderer.datasetPrep(yaml, mockEl);
+
+      expect(result.chartOptions.data.datasets[0].fill).toBe(true);
+    });
+
+    it('returns width from yaml', async () => {
+      const yaml = {
+        type: 'bar',
+        labels: ['A', 'B'],
+        series: [{ title: 'S1', data: [1, 2] }],
+        width: '500px'
+      };
+
+      const result = await renderer.datasetPrep(yaml, mockEl);
+
+      expect(result.width).toBe('500px');
+    });
   });
 
   describe('renderRaw', () => {
@@ -108,6 +160,16 @@ describe('Renderer', () => {
       const data = { type: 'pie', data: { labels: [], datasets: [] } };
       renderer.renderRaw(data, mockEl);
       expect(mockEl.querySelector('canvas')).not.toBeNull();
+    });
+
+    it('applies width from data', () => {
+      const data = { 
+        chartOptions: { type: 'line', data: { labels: [], datasets: [] } },
+        width: '600px'
+      };
+      renderer.renderRaw(data, mockEl);
+      const container = mockEl.querySelector('canvas')?.parentElement;
+      expect(container?.style.width).toBe('600px');
     });
   });
 
