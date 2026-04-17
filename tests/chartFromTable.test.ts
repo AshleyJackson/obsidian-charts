@@ -1,8 +1,6 @@
 import { chartFromTable, generateTableData } from '../src/chartFromTable';
 import { Extractor } from 'markdown-tables-to-json';
 
-jest.mock('markdown-tables-to-json');
-
 describe('chartFromTable', () => {
   let mockEditor: any;
 
@@ -11,9 +9,6 @@ describe('chartFromTable', () => {
       getSelection: () => '| Header1 | Header2 |\n|---------|---------|\n| 1       | 2       |',
       replaceSelection: jest.fn()
     };
-    (Extractor.extractObject as jest.Mock).mockReturnValue({
-      Col1: { Row1: '1', Row2: '2' }
-    });
   });
 
   it('generates chart from column layout', () => {
@@ -29,22 +24,28 @@ describe('chartFromTable', () => {
 
 describe('generateTableData', () => {
   it('parses column layout correctly', () => {
-    (Extractor.extractObject as jest.Mock).mockReturnValueOnce({
-      'A': { '1': '1', '2': '2' }
-    });
-    const result = generateTableData('| A | B |\n| 1 | 2 |', 'columns');
-    expect(result.labels).toEqual(['1', '2']);
+    // markdown-tables-to-json treats first column as labels
+    // Table: | A | B |
+    //        |---|---|
+    //        | 1 | 2 |
+    //        | 3 | 4 |
+    // Labels = ['1', '3'] (first column values)
+    // dataFields = [{ title: 'B', data: ['2', '4'] }]
+    const table = '| A | B |\n|---|---|\n| 1 | 2 |\n| 3 | 4 |';
+    const result = generateTableData(table, 'columns');
+    expect(result.labels).toEqual(['1', '3']);
     expect(result.dataFields).toHaveLength(1);
+    expect(result.dataFields[0].dataTitle).toBe('B');
   });
 
   it('handles malformed table', () => {
-    jest.spyOn(Extractor, 'extractObject').mockImplementation(() => { throw new Error('Malformed'); });
     expect(() => generateTableData('invalid', 'columns')).toThrow();
   });
 
   it('filters selected fields', () => {
-    const table = '| A | B |\n| 1 | 2 |\n| 3 | 4 |';
-    const result = generateTableData(table, 'columns', ['A']);
-    expect(result.dataFields[0].dataTitle).toBe('A');
+    // When filtering by 'B', only column B is included
+    const table = '| A | B |\n|---|---|\n| 1 | 2 |\n| 3 | 4 |';
+    const result = generateTableData(table, 'columns', ['B']);
+    expect(result.dataFields[0].dataTitle).toBe('B');
   });
 });

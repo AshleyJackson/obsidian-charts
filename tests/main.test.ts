@@ -1,27 +1,32 @@
-// Mock obsidian and Renderer
-jest.mock('../src/chartRenderer', () => ({
-  default: jest.fn().mockImplementation(() => ({
-    renderRaw: jest.fn(),
-    renderFromYaml: jest.fn()
-  }))
-}));
-
-jest.mock('../src/util', () => ({
-  renderError: jest.fn()
-}));
+import ChartPlugin from '../src/main';
 
 describe('Main Plugin', () => {
-  let plugin: any;
+  let plugin: ChartPlugin;
   let mockApp: any;
 
   beforeEach(async () => {
-    jest.resetModules();
     mockApp = {
-      workspace: { onLayoutReady: jest.fn() },
-      vault: { getAbstractFileByPath: jest.fn() },
-      metadataCache: { getFileCache: jest.fn() }
+      workspace: { 
+        onLayoutReady: jest.fn((cb) => cb()),
+        activeLeaf: null,
+        on: jest.fn(),
+        off: jest.fn()
+      },
+      vault: { 
+        getAbstractFileByPath: jest.fn(),
+        cachedRead: jest.fn(),
+        createBinary: jest.fn()
+      },
+      metadataCache: { 
+        getFileCache: jest.fn(),
+        getFirstLinkpathDest: jest.fn(),
+        on: jest.fn(),
+        off: jest.fn()
+      },
+      fileManager: {
+        generateMarkdownLink: jest.fn((file, path) => `![[${file.path}]]`)
+      }
     };
-    const ChartPlugin = (await import('../src/main')).default;
     plugin = new ChartPlugin(mockApp);
     await plugin.loadSettings();
   });
