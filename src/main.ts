@@ -55,26 +55,27 @@ export default class ChartPlugin extends Plugin {
         var x = data.series[0].data;
       }
 
-      let y = data.labels;
-      let outX = 0;
-      let outY = 0;
-      let outX2 = 0;
-      let outXY = 0;
+      // Linear regression of data values (y) against index positions (i)
+      let n = x.length;
+      let sumX = 0;
+      let sumY = 0;
+      let sumXY = 0;
+      let sumX2 = 0;
 
-      for (let i = 0; i < x.length; ++i) {
-        outX = outX + x[i];
-        outY = outY + y[i];
-        outX2 = outX2 + x[i] * x[i];
-        outXY = outXY + x[i] * y[i];
+      for (let i = 0; i < n; ++i) {
+        let yVal = typeof x[i] === 'string' ? parseFloat(x[i]) : x[i];
+        sumX = sumX + i;
+        sumY = sumY + yVal;
+        sumX2 = sumX2 + i * i;
+        sumXY = sumXY + i * yVal;
       }
-      let gradient =
-        (x.length * outXY - outY * outX) / (x.length * outX2 - outX * outX);
-      let intercept = (outY - gradient * outX) / x.length;
+      let gradient = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+      let intercept = (sumY - gradient * sumX) / n;
 
-      // Form points from equation
+      // Form points from equation: y = gradient * i + intercept
       let YVals = [];
-      for (let i = 0; i < y.length; ++i) {
-        YVals.push((y[i] - intercept) / gradient);
+      for (let i = 0; i < n; ++i) {
+        YVals.push(gradient * i + intercept);
       }
 
       if (data.bestFitTitle != undefined && data.bestFitTitle != 'undefined') {
