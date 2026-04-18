@@ -6,6 +6,5 @@
     "description": "This Plugin lets you create Charts within Obsidian",
     "author": "Ashley Jackson",
     "authorUrl": "https://github.com/AshleyJackson",
-    "isDesktopOnly": false,
-    "fundingUrl": "https://ko-fi.com/phibr0"
+    "isDesktopOnly": false
 }

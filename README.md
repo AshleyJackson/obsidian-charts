@@ -1,4 +1,4 @@
-# Obsidian-Charts [![GitHub tag (latest by date)](https://img.shields.io/github/v/tag/phibr0/obsidian-charts)](https://github.com/phibr0/obsidian-charts/releases) [![Release Obsidian Plugin](https://github.com/phibr0/obsidian-charts/actions/workflows/release.yml/badge.svg)](https://github.com/phibr0/obsidian-charts/actions/workflows/release.yml) ![GitHub all releases](https://img.shields.io/github/downloads/phibr0/obsidian-charts/total)
+# Obsidian-Charts [![GitHub tag (latest by date)](https://img.shields.io/github/v/tag/ashleyjackson/obsidian-charts)](https://github.com/ashleyjackson/obsidian-charts/releases) [![Release Obsidian Plugin](https://github.com/ashleyjackson/obsidian-charts/actions/workflows/release.yml/badge.svg)](https://github.com/ashleyjackson/obsidian-charts/actions/workflows/release.yml) ![GitHub all releases](https://img.shields.io/github/downloads/ashleyjackson/obsidian-charts/total)
 
 This plugin lets you create interactive Charts in [Obsidian](https://www.obsidian.md).
 
@@ -55,7 +55,7 @@ series:
 ```
 ```
 
-![Bar Chart](https://github.com/phibr0/obsidian-charts/raw/master/images/barchart.png)
+![Bar Chart](https://github.com/ashleyjackson/obsidian-charts/raw/master/images/barchart.png)
 
 **Bar-specific modifiers:** `indexAxis` (set to `y` for horizontal bars), `stacked`
 
@@ -75,7 +75,7 @@ series:
 ```
 ```
 
-![Line Chart](https://github.com/phibr0/obsidian-charts/raw/master/images/linechart.png)
+![Line Chart](https://github.com/ashleyjackson/obsidian-charts/raw/master/images/linechart.png)
 
 **Line-specific modifiers:** `bestFit`, `stepped`, `fill`, `tension`, `spanGaps`
 
@@ -469,9 +469,3 @@ Valid for `bar` and `line` types only.
 | `rMin` / `rMax` | `number` | Set radial axis min/max for radar and polar area charts |
 | `xDisplay` / `yDisplay` | `boolean` | Show/hide the axis. Default: `true` |
 | `xTickDisplay` / `yTickDisplay` | `boolean` | Show/hide axis ticks. Default: `true` |
-
-## Support
-
-If you find this plugin helpful, consider supporting me:
-
-<a href="https://www.buymeacoffee.com/phibr0"><img src="https://img.buymeacoffee.com/button-api/?slug=phibr0&font_family=Inter&button_colour=FFDD00"></a>
