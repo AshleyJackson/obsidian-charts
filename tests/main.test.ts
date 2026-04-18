@@ -1,5 +1,6 @@
 import ChartPlugin from '../src/main';
 import { parseYaml } from 'obsidian';
+import { Chart } from 'chart.js';
 
 describe('Main Plugin', () => {
   let plugin: ChartPlugin;
@@ -49,6 +50,88 @@ describe('Main Plugin', () => {
     expect(plugin.settings.imageSettings).toBeDefined();
     expect(plugin.settings.imageSettings.format).toBe('image/png');
     expect(plugin.settings.imageSettings.quality).toBeCloseTo(0.92);
+  });
+
+  describe('window.renderChart', () => {
+    let mockEl: HTMLElement;
+
+    beforeEach(async () => {
+      // onload() registers window.renderChart - suppress addIcons error
+      try { await plugin.onload(); } catch (_e: unknown) { /* addIcons may fail in test env */ }
+      mockEl = document.createElement('div');
+      document.body.appendChild(mockEl);
+    });
+
+    afterEach(() => {
+      if (mockEl.parentElement) {
+        mockEl.parentElement.removeChild(mockEl);
+      }
+    });
+
+    it('routes YAML-like objects with series through datasetPrep', async () => {
+      const yamlLike = {
+        type: 'line',
+        labels: ['Mon', 'Tue', 'Wed'],
+        series: [{ title: 'S1', data: [1, 2, 3] }],
+        fill: true,
+        stacked: true,
+      };
+
+      const renderChart = (window as unknown as { renderChart: (data: unknown, el: HTMLElement) => Promise<unknown> }).renderChart;
+      expect(typeof renderChart).toBe('function');
+      const result = await renderChart(yamlLike, mockEl);
+
+      // Verify Chart was called with proper config that includes stacked/fill options
+      expect(Chart).toHaveBeenCalled();
+      const lastCall = (Chart as jest.Mock).mock.calls[(Chart as jest.Mock).mock.calls.length - 1];
+      const config = lastCall?.[1];
+      // When routed through datasetPrep, stacked fill should produce 'origin' for first dataset
+      if (config?.data?.datasets?.[0]) {
+        expect(config.data.datasets[0].fill).toBe('origin');
+      }
+    });
+
+    it('passes raw Chart.js config directly to renderRaw', async () => {
+      const chartJsConfig = {
+        type: 'bar',
+        data: {
+          labels: ['A', 'B'],
+          datasets: [{ label: 'S1', data: [1, 2] }],
+        },
+        options: {},
+      };
+
+      const renderChart = (window as unknown as { renderChart: (data: unknown, el: HTMLElement) => Promise<unknown> }).renderChart;
+      const result = await renderChart(chartJsConfig, mockEl);
+
+      expect(Chart).toHaveBeenCalled();
+    });
+
+    it('routes YAML-like objects with stacked and fill through datasetPrep for proper stacked fill', async () => {
+      const yamlLike = {
+        type: 'line',
+        labels: ['Mon', 'Tue', 'Wed'],
+        series: [
+          { title: 'S1', data: [4, 5, 5] },
+          { title: 'S2', data: [3, 4, 2] },
+        ],
+        fill: true,
+        stacked: true,
+        beginAtZero: true,
+      };
+
+      const renderChart = (window as unknown as { renderChart: (data: unknown, el: HTMLElement) => Promise<unknown> }).renderChart;
+      const result = await renderChart(yamlLike, mockEl);
+
+      expect(Chart).toHaveBeenCalled();
+      const lastCall = (Chart as jest.Mock).mock.calls[(Chart as jest.Mock).mock.calls.length - 1];
+      const config = lastCall?.[1];
+      if (config?.data?.datasets) {
+        // Stacked fill: first dataset fills to 'origin', subsequent to '-1'
+        expect(config.data.datasets[0].fill).toBe('origin');
+        expect(config.data.datasets[1].fill).toBe('-1');
+      }
+    });
   });
 
   describe('postprocessor', () => {

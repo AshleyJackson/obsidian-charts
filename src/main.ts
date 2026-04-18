@@ -17,7 +17,9 @@ import { CreationHelperModal } from './ui/creationHelperModal';
 import { addIcons } from 'src/ui/icons';
 import { chartFromTable } from 'src/chartFromTable';
 import { renderError, saveImageToVaultAndPaste } from 'src/util';
-import type { ChartYaml } from './types';
+import type { ChartYaml, DatasetPrepResult } from './types';
+import type { ChartConfiguration } from 'chart.js';
+import type { Chart } from 'chart.js';
 
 export default class ChartPlugin extends Plugin {
   settings!: ChartPluginSettings;
@@ -99,14 +101,26 @@ export default class ChartPlugin extends Plugin {
 
     await this.loadSettings();
 
-    addIcons();
-
     this.renderer = new Renderer(this);
 
-    type RenderChartFn = (data: unknown, el: HTMLElement) => Chart | null;
-    (window as unknown as { renderChart: RenderChartFn }).renderChart = this.renderer.renderRaw as RenderChartFn;
+    type RenderChartFn = (data: unknown, el: HTMLElement) => Promise<Chart | null> | Chart | null;
+    (window as unknown as { renderChart: RenderChartFn }).renderChart = async (data: unknown, el: HTMLElement): Promise<Chart | null> => {
+      // If the input looks like a YAML config (has 'series' at top level),
+      // route it through datasetPrep() so fill, stacked, spanGaps, etc. are handled.
+      // Otherwise, treat it as a raw Chart.js ChartConfiguration.
+      if (data && typeof data === 'object' && !('chartOptions' in (data as Record<string, unknown>))) {
+        const obj = data as Record<string, unknown>;
+        if ('series' in obj) {
+          const prepared = await this.renderer.datasetPrep(obj as unknown as ChartYaml, el);
+          return this.renderer.renderRaw(prepared, el);
+        }
+      }
+      return this.renderer.renderRaw(data as DatasetPrepResult | ChartConfiguration, el);
+    };
 
     console.log('Charts: Initialized renderer and global renderChart');
+
+    addIcons();
 
     this.addSettingTab(new ChartSettingTab(this.app, this));
 
@@ -243,7 +257,3 @@ export default class ChartPlugin extends Plugin {
     console.log('unloading plugin: Charts');
   }
 }
-
-// Import ChartConfiguration type for the advanced-chart processor
-import type { ChartConfiguration } from 'chart.js';
-import type { Chart } from 'chart.js';
