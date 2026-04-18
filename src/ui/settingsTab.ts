@@ -35,6 +35,15 @@ export class ChartSettingTab extends PluginSettingTab {
 
     containerEl.createEl('h2', { text: 'Settings - Charts' });
 
+    const infoEl = containerEl.createEl('p');
+    infoEl.createEl('strong', { text: 'Obsidian Charts' });
+    infoEl.appendText(` v${this.plugin.manifest.version}`);
+    infoEl.appendText(' by ');
+    infoEl.createEl('a', {
+      text: 'Ashley Jackson',
+      href: 'https://github.com/AshleyJackson',
+    });
+
     containerEl.createEl('h3', { text: 'General' });
 
     new Setting(containerEl)
