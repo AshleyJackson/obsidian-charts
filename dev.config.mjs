@@ -1,7 +1,6 @@
 import esbuild from "esbuild";
 import sveltePlugin from "esbuild-svelte";
 import process from "process";
-import autoPreprocess from "svelte-preprocess";
 
 const banner = 
 `/*
@@ -10,7 +9,7 @@ if you want to view the source visit the plugins github repository (https://gith
 */
 `;
 
-esbuild.build({
+const ctx = await esbuild.context({
     banner: {
         js: banner,
     },
@@ -19,14 +18,15 @@ esbuild.build({
     external: ['obsidian'],
     format: 'cjs',
     minify: true,
-    watch: true,
     logLevel: "info",
     plugins: [sveltePlugin({
         compileOptions: {
             css: true,
             dev: true,
         },
-        preprocess: autoPreprocess(),
     })],
     outfile: 'main.js',
-}).catch(() => process.exit(1));
+});
+
+await ctx.watch();
+console.log('Watching for changes...');

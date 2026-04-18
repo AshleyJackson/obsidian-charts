@@ -8,14 +8,15 @@ export function generateInnerColors(colors: string[], alpha = 0.25) {
     return colors.map((color: string) => chroma(color.trim()).alpha(alpha).hex());
 }
 
-export function renderError(error: any, el: HTMLElement) {
+export function renderError(error: unknown, el: HTMLElement) {
   console.error('Charts: Render error -', error);
   const errorEl = el.createDiv({ cls: "chart-error" });
   errorEl.createEl("b", { text: "Couldn't render Chart:" });
-  errorEl.createEl("pre").createEl("code", { text: error.toString?.() ?? error });
+  const errorText = error instanceof Error ? error.message : String(error);
+  errorEl.createEl("pre").createEl("code", { text: errorText });
   errorEl.createEl("hr");
   errorEl.createEl("span").innerHTML = "You might also want to look for further Errors in the Console: Press <kbd>CTRL</kbd> + <kbd>SHIFT</kbd> + <kbd>I</kbd> to open it.";
-  new Notice('Chart failed to load: ' + (error.message || error.toString()));
+  new Notice('Chart failed to load: ' + errorText);
 }
 
 export function base64ToArrayBuffer(base64: string) {
@@ -31,9 +32,10 @@ export function base64ToArrayBuffer(base64: string) {
 export async function saveImageToVaultAndPaste(editor: Editor, app: App, renderer: Renderer, source: TFile, settings: ChartPluginSettings) {
   const image = await renderer.imageRenderer(editor.getSelection(), settings.imageSettings);
   console.log("image converted")
+  const formatExt = settings.imageSettings.format.split('/').pop() ?? 'png';
+  const attachmentPath = await (app.vault as unknown as { getAvailablePathForAttachments: (name: string, ext: string, file: TFile) => Promise<string> }).getAvailablePathForAttachments(`Chart ${new Date().toDateString()}`, formatExt, source);
   const file = await app.vault.createBinary(
-      //@ts-ignore
-      await app.vault.getAvailablePathForAttachments(`Chart ${new Date().toDateString()}`, settings.imageSettings.format.split('/').last(), source),
+      attachmentPath,
       base64ToArrayBuffer(image)
   );
   console.log("Image saved")

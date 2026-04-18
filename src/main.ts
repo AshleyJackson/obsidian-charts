@@ -6,23 +6,22 @@ import {
   Editor,
   View,
   Notice,
-  MarkdownPostProcessorContext,
 } from 'obsidian';
+import type { MarkdownPostProcessorContext, MarkdownFileInfo } from 'obsidian';
 
 import Renderer from './chartRenderer';
-import {
-  ChartPluginSettings,
-  DEFAULT_SETTINGS,
-} from './constants/settingsConstants';
+import type { ChartPluginSettings } from './constants/settingsConstants';
+import { DEFAULT_SETTINGS } from './constants/settingsConstants';
 import { ChartSettingTab } from './ui/settingsTab';
 import { CreationHelperModal } from './ui/creationHelperModal';
 import { addIcons } from 'src/ui/icons';
 import { chartFromTable } from 'src/chartFromTable';
 import { renderError, saveImageToVaultAndPaste } from 'src/util';
+import type { ChartYaml } from './types';
 
 export default class ChartPlugin extends Plugin {
-  settings: ChartPluginSettings;
-  renderer: Renderer;
+  settings!: ChartPluginSettings;
+  renderer!: Renderer;
 
   postprocessor = async (
     content: string,
@@ -30,11 +29,11 @@ export default class ChartPlugin extends Plugin {
     ctx: MarkdownPostProcessorContext
   ) => {
     console.log('Charts: Processing chart code block, content length:', content.length);
-    let data;
+    let data: ChartYaml;
     try {
-      data = await parseYaml(content.replace(/	/g, '    '));
+      data = await parseYaml(content.replace(/\t/g, '    ')) as ChartYaml;
       console.log('Charts: Parsed YAML data:', data.type, 'labels length:', data.labels?.length, 'series count:', data.series?.length);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Charts: YAML parse error:', error);
       renderError(error, el);
       return;
@@ -46,44 +45,36 @@ export default class ChartPlugin extends Plugin {
         return;
       }
     }
-    if (data.bestFit === true && data.type === 'line') {
+    if (data.bestFit === true && data.type === 'line' && data.series) {
       console.log('Charts: Applying best fit line');
-      if (data.bestFitNumber != undefined) {
-        var x = data.series[Number(data.bestFitNumber)].data;
-      } else {
-        // Default to line 0
-        var x = data.series[0].data;
-      }
+      const seriesIndex = data.bestFitNumber != undefined ? Number(data.bestFitNumber) : 0;
+      const x = data.series[seriesIndex].data;
 
-      // Linear regression of data values (y) against index positions (i)
-      let n = x.length;
+      const n = x.length;
       let sumX = 0;
       let sumY = 0;
       let sumXY = 0;
       let sumX2 = 0;
 
       for (let i = 0; i < n; ++i) {
-        let yVal = typeof x[i] === 'string' ? parseFloat(x[i]) : x[i];
+        const yVal: number = typeof x[i] === 'string' ? parseFloat(x[i] as string) : (x[i] as number);
         sumX = sumX + i;
         sumY = sumY + yVal;
         sumX2 = sumX2 + i * i;
         sumXY = sumXY + i * yVal;
       }
-      let gradient = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
-      let intercept = (sumY - gradient * sumX) / n;
+      const gradient = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+      const intercept = (sumY - gradient * sumX) / n;
 
-      // Form points from equation: y = gradient * i + intercept
-      let YVals = [];
+      const YVals: number[] = [];
       for (let i = 0; i < n; ++i) {
         YVals.push(gradient * i + intercept);
       }
 
-      if (data.bestFitTitle != undefined && data.bestFitTitle != 'undefined') {
-        var title = String(data.bestFitTitle);
-      } else {
-        var title = 'Line of Best Fit';
-      }
-      // Create line
+      const title = (data.bestFitTitle != undefined && data.bestFitTitle !== 'undefined')
+        ? String(data.bestFitTitle)
+        : 'Line of Best Fit';
+
       data.series.push({
         title: title,
         data: YVals,
@@ -112,8 +103,8 @@ export default class ChartPlugin extends Plugin {
 
     this.renderer = new Renderer(this);
 
-    //@ts-ignore
-    window.renderChart = this.renderer.renderRaw;
+    type RenderChartFn = (data: unknown, el: HTMLElement) => Chart | null;
+    (window as unknown as { renderChart: RenderChartFn }).renderChart = this.renderer.renderRaw as RenderChartFn;
 
     console.log('Charts: Initialized renderer and global renderChart');
 
@@ -126,8 +117,8 @@ export default class ChartPlugin extends Plugin {
       name: 'Insert new Chart',
       checkCallback: (checking: boolean) => {
         console.log('Charts: Checking for creation helper command');
-        let leaf = this.app.workspace.activeLeaf;
-        if (leaf.view instanceof MarkdownView) {
+        const leaf = this.app.workspace.activeLeaf;
+        if (leaf && leaf.view instanceof MarkdownView) {
           if (!checking) {
             console.log('Charts: Opening creation helper modal');
             new CreationHelperModal(
@@ -146,9 +137,9 @@ export default class ChartPlugin extends Plugin {
     this.addCommand({
       id: 'chart-from-table-column',
       name: 'Create Chart from Table (Column oriented Layout)',
-      editorCheckCallback: (checking: boolean, editor: Editor, view: View) => {
+      editorCheckCallback: (checking: boolean, editor: Editor, view: MarkdownView | MarkdownFileInfo) => {
         console.log('Charts: Checking for chart from table column command');
-        let selection = editor.getSelection();
+        const selection = editor.getSelection();
         if (
           view instanceof MarkdownView &&
           selection.split('\n').length >= 3 &&
@@ -167,7 +158,7 @@ export default class ChartPlugin extends Plugin {
     this.addCommand({
       id: 'chart-from-table-row',
       name: 'Create Chart from Table (Row oriented Layout)',
-      editorCheckCallback: (checking: boolean, editor: Editor, view: View) => {
+      editorCheckCallback: (checking: boolean, editor: Editor, view: MarkdownView | MarkdownFileInfo) => {
         console.log('Charts: Checking for chart from table row command');
         if (
           view instanceof MarkdownView &&
@@ -187,10 +178,12 @@ export default class ChartPlugin extends Plugin {
     this.addCommand({
       id: 'chart-to-svg',
       name: 'Create Image from Chart',
-      editorCheckCallback: (checking: boolean, editor: Editor, view: View) => {
+      editorCheckCallback: (checking: boolean, editor: Editor, view: MarkdownView | MarkdownFileInfo) => {
         console.log('Charts: Checking for chart to SVG command');
+        const viewFile = view instanceof MarkdownView ? view.file : null;
         if (
           view instanceof MarkdownView &&
+          viewFile &&
           editor.getSelection().startsWith('```chart') &&
           editor.getSelection().endsWith('```')
         ) {
@@ -201,7 +194,7 @@ export default class ChartPlugin extends Plugin {
               editor,
               this.app,
               this.renderer,
-              view.file,
+              viewFile,
               this.settings
             );
           }
@@ -214,24 +207,21 @@ export default class ChartPlugin extends Plugin {
     this.registerMarkdownCodeBlockProcessor('chart', this.postprocessor);
     this.registerMarkdownCodeBlockProcessor(
       'advanced-chart',
-      async (data, el) => this.renderer.renderRaw(await JSON.parse(data), el)
+      async (data: string, el: HTMLElement) => this.renderer.renderRaw(JSON.parse(data) as ChartConfiguration, el)
     );
 
     console.log('Charts: Registered code block processors');
 
-    // Remove this ignore when the obsidian package is updated on npm
-    // Editor mode
-    // @ts-ignore
     this.registerEvent(
       this.app.workspace.on(
         'editor-menu',
-        (menu: Menu, _: Editor, view: MarkdownView) => {
-          if (view && this.settings.contextMenu) {
+        (menu: Menu, _: Editor, view: MarkdownView | MarkdownFileInfo) => {
+          if (view instanceof MarkdownView && this.settings.contextMenu) {
             menu.addItem((item) => {
               item
                 .setTitle('Insert Chart')
                 .setIcon('chart')
-                .onClick((_) => {
+                .onClick(() => {
                   console.log('Charts: Context menu clicked, opening modal');
                   new CreationHelperModal(
                     this.app,
@@ -253,3 +243,7 @@ export default class ChartPlugin extends Plugin {
     console.log('unloading plugin: Charts');
   }
 }
+
+// Import ChartConfiguration type for the advanced-chart processor
+import type { ChartConfiguration } from 'chart.js';
+import type { Chart } from 'chart.js';

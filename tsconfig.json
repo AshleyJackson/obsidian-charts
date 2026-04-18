@@ -4,12 +4,14 @@
   "include": ["src/**/*"],
   "exclude": ["node_modules/*"],
   "compilerOptions": {
-    "types": ["node", "svelte"],
+    "types": ["node"],
+    "ignoreDeprecations": "6.0",
     "baseUrl": ".",
     "paths": {
       "src": ["src/*"]
     },
     "alwaysStrict": true,
-    "noImplicitAny": true
+    "noImplicitAny": true,
+    "typeRoots": ["./node_modules/@types", "./src"]
   }
 }

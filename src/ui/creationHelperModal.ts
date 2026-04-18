@@ -1,6 +1,7 @@
 import { App, MarkdownView, Modal } from "obsidian";
 import type Renderer from "../chartRenderer"
 import type { ChartPluginSettings } from "../constants/settingsConstants";
+// @ts-ignore - Svelte component import lacks type declarations
 import HelperModal from './HelperModal.svelte';
 
 export class CreationHelperModal extends Modal {

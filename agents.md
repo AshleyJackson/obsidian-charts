@@ -53,6 +53,11 @@ Charts can link to tables using block IDs. The ID format uses `^` prefix in YAML
 
 Block IDs that follow tables in reading mode are automatically hidden via CSS in `styles.css`. This prevents the `^table-id` link from being visually disruptive below linked tables.
 
+### Wikilink Alias Pipe Escaping
+Obsidian uses `\|` inside wikilinks to create aliases (e.g., `[[Page\|Alias]]`). The `\|` is meant to be a display separator, not a table cell delimiter. However, the `markdown-tables-to-json` library (which uses `@ts-stack/markdown`) treats `\|` as a regular pipe and splits the cell.
+
+The fix in `generateTableData()` replaces `\|` inside `[[...]]` with a placeholder before parsing, then restores the pipe character in the extracted data (both keys and values) after parsing. This preserves the wikilink alias as a single cell value.
+
 ### Stepped Line Modifier
 The `stepped` modifier is supported in line and bar charts. When set, it renders the line in a stepped fashion (before/after/middle) per Chart.js's `stepped` option. The property is passed through from YAML to the dataset configuration in both standalone charts and table-linked charts.
 
@@ -80,15 +85,16 @@ The `obsidian` npm package is **type definitions only** - it provides no runtime
 
 **Mocked Packages:**
 - `obsidian` - Type-only package, needs runtime mock
-- `chart.js` - Complex DOM/Canvas dependencies
-- `chartjs-chart-sankey` - Sankey chart controller
-- `chartjs-plugin-annotation` - Annotation plugin
+- `chart.js` - v4: Complex DOM/Canvas dependencies, ESM. Mock provides Chart constructor, defaults, registerables
+- `chartjs-chart-sankey` - v0.14: ESM-only. Mock provides SankeyController and Flow classes
+- `chartjs-plugin-annotation` - v3: ESM-only. Mock provides annotation plugin object
+- `chroma-js` - v3: ESM-only, returns 8-digit hex with alpha. Mock provides functional color API
+- `markdown-tables-to-json` - Dependency `@ts-stack/markdown` is ESM-only. Mock provides working table parser
 - `vanilla-picker` - Color picker component
 - `*.svelte` - Svelte components
 
 **Real Packages Used:**
-- `markdown-tables-to-json` - Table parsing (pure JS, works in jsdom)
-- `chroma-js` - Color manipulation (pure JS)
+- `luxon` - Date parsing and validation (pure JS, works in jsdom)
 
 ### Jest Configuration
 
@@ -100,9 +106,17 @@ The `obsidian` npm package is **type definitions only** - it provides no runtime
   moduleNameMapper: {
     '^obsidian$': '<rootDir>/__mocks__/obsidian.js',
     '^chart\\.js(/.*)?$': '<rootDir>/__mocks__/chart.js',
+    '^chartjs-chart-sankey$': '<rootDir>/__mocks__/chartjs-chart-sankey.js',
+    '^chartjs-plugin-annotation$': '<rootDir>/__mocks__/chartjs-plugin-annotation.js',
+    '^chroma-js$': '<rootDir>/__mocks__/chroma-js.js',  // ESM-only in v3
+    '^markdown-tables-to-json$': '<rootDir>/__mocks__/markdown-tables-to-json.js',  // @ts-stack/markdown is ESM
     // ... other mocks
   },
-  roots: ['<rootDir>/src', '<rootDir>/tests']
+  transform: {
+    '^.+\\.ts$': ['ts-jest', { tsconfig: 'jest.tsconfig.json' }],
+    '^.+\\.m?js$': ['ts-jest', { tsconfig: 'jest.tsconfig.json' }],  // Transform ESM packages
+  },
+  transformIgnorePatterns: [],  // All ESM handled via mocks
 }
 ```
 
@@ -165,16 +179,33 @@ Provides minimal implementations for:
 - `Modal`, `PluginSettingTab` - UI classes
 - `Editor` - Text editing with `getSelection()`, `replaceSelection()`
 
-### chart.js Mock
+### chart.js Mock (v4)
 ```javascript
-const Chart = jest.fn().mockImplementation(() => ({
+const Chart = jest.fn().mockImplementation((_context, _config) => ({
   destroy: jest.fn(),
   toBase64Image: jest.fn().mockReturnValue('data:image/png;base64,mock'),
+  data: _config?.data ?? { labels: [], datasets: [] },
+  options: _config?.options ?? {},
+  // ... additional v4 properties
 }));
-Chart.defaults = { color: '', font: {}, plugins: {}, layout: {} };
+// v4: registerables is array-like (not empty), defaults has flatter structure
+Chart.defaults = { color: '#666', font: {...}, plugins: { legend: {...}, ... }, ... };
 Chart.register = jest.fn();
-const registerables = []; // Empty for testing
+const registerables = { 0: jest.fn(), 1: jest.fn(), ..., length: 4 };
 ```
+
+### chroma-js Mock (v3)
+```javascript
+// v3 is ESM-only, returns 8-digit hex with alpha channel
+const chroma = jest.fn().mockImplementation((color) => ({
+  alpha: jest.fn().mockReturnValue({ hex: jest.fn().mockReturnValue(color + '40') }),
+  hex: jest.fn().mockReturnValue(color),
+  // ... additional methods
+}));
+```
+
+### markdown-tables-to-json Mock
+The real package depends on `@ts-stack/markdown` which is ESM-only and incompatible with Jest's CJS transform. A working mock table parser is provided in `__mocks__/markdown-tables-to-json.js`.
 
 ## Common Issues & Solutions
 
@@ -251,33 +282,36 @@ it('parses European date format DD-MM-YYYY', () => {
 ## Dependencies
 
 **Production:**
-- `chart.js` - Chart rendering library
-- `chartjs-chart-sankey` - Sankey diagram support
-- `chartjs-plugin-annotation` - Chart annotations
-- `chroma-js` - Color manipulation
+- `chart.js` - v4: Chart rendering library (ESM)
+- `chartjs-chart-sankey` - v0.14: Sankey diagram support (ESM)
+- `chartjs-plugin-annotation` - v3: Chart annotations (ESM)
+- `chroma-js` - v3: Color manipulation (ESM, returns 8-digit hex with alpha)
 - `luxon` - Date parsing and validation
-- `markdown-tables-to-json` - Table parsing
-- `svelte` - UI framework
+- `markdown-tables-to-json` - Table parsing (CJS, but dependency @ts-stack/markdown is ESM)
 - `vanilla-picker` - Color picker
 
 **Development:**
-- `jest` - Testing framework
-- `ts-jest` - TypeScript support for Jest
+- `jest` - v30: Testing framework
+- `ts-jest` - v29: TypeScript support for Jest
 - `jest-canvas-mock` - Canvas mocking
-- `jest-environment-jsdom` - DOM environment
+- `jest-environment-jsdom` - v30: DOM environment
+- `typescript` - v6: TypeScript compiler
 - `@types/luxon` - TypeScript types for Luxon
+- `svelte` - v5: UI framework (peer dependency via esbuild-svelte)
 
 ## Notes for Future Agents
 
 1. **Don't remove mocks** - The obsidian mock is essential since the package is type-only
-2. **Use real DOM elements** - When testing code that uses `getComputedStyle()`
-3. **Extend HTMLElement** - Add Obsidian's helper methods to the prototype
+2. **ESM-only packages** - chart.js v4, chroma-js v3, chartjs-chart-sankey v0.14, chartjs-plugin-annotation v3, and @ts-stack/markdown (dep of markdown-tables-to-json) are all ESM-only. They must be mocked in `moduleNameMapper` rather than transformed
+3. **Extend HTMLElement** - Add Obsidian's helper methods to the prototype (done in `tests/setup.ts`)
 4. **Date auto-transpose** - Tables with date keys are automatically transposed for time series
 5. **Block IDs** - Strip `^` prefix when searching Obsidian's fileCache.sections
-6. **ESM modules need mocking** - The date-adapter uses ESM imports from obsidian
-7. **Always update tests** - When adding features, add corresponding tests in the same session
-8. **String data values** - YAML may parse numbers as strings; code auto-converts via `parseFloat()`
-9. **Debounced reload** - Chart reload on metadata change uses 500ms debounce; timer must be cleaned up in `onunload()`
-10. **Canvas dimensions** - Image export respects YAML `width` property; percentage widths default to 600px for images
-11. **Best fit computation** - Uses linear regression on index positions (i) vs data values (y); computed in postprocessor before rendering
-12. **Stepped modifier** - Passed directly to Chart.js dataset; valid for line and bar chart types
+6. **String data values** - YAML may parse numbers as strings; code auto-converts via `parseFloat()`
+7. **Debounced reload** - Chart reload on metadata change uses 500ms debounce; timer must be cleaned up in `onunload()`
+8. **Canvas dimensions** - Image export respects YAML `width` property; percentage widths default to 600px for images
+9. **Best fit computation** - Uses linear regression on index positions (i) vs data values (y); computed in postprocessor before rendering
+10. **Stepped modifier** - Passed directly to Chart.js dataset; valid for line and bar chart types
+11. **Wikilink pipe escaping** - `\|` inside `[[...]]` is replaced with a placeholder before table parsing, then restored after
+12. **chroma-js v3 alpha** - Returns 8-digit hex (e.g., `#ff000040`) instead of rgba; Chart.js v4 accepts this
+13. **TypeScript 6** - Requires `"ignoreDeprecations": "6.0"` in tsconfig and `"moduleResolution": "bundler"` in jest.tsconfig
+14. **Always update tests** - When adding features, add corresponding tests in the same session

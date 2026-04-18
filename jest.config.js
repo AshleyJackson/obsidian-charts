@@ -8,7 +8,11 @@ const config = {
   transform: {
     '^.+\\.ts$': ['ts-jest', {
       tsconfig: 'jest.tsconfig.json'
-    }]
+    }],
+    // Transform ESM packages in node_modules
+    '^.+\\.m?js$': ['ts-jest', {
+      tsconfig: 'jest.tsconfig.json'
+    }],
   },
   moduleNameMapper: {
     '^obsidian$': '<rootDir>/__mocks__/obsidian.js',
@@ -16,15 +20,13 @@ const config = {
     '^chart\\.js(/.*)?$': '<rootDir>/__mocks__/chart.js',
     '^chartjs-chart-sankey$': '<rootDir>/__mocks__/chartjs-chart-sankey.js',
     '^chartjs-plugin-annotation$': '<rootDir>/__mocks__/chartjs-plugin-annotation.js',
-    '^chroma-js$': '<rootDir>/node_modules/chroma-js',
-    '^markdown-tables-to-json$': '<rootDir>/node_modules/markdown-tables-to-json',
+    '^chroma-js$': '<rootDir>/__mocks__/chroma-js.js',
+    '^markdown-tables-to-json$': '<rootDir>/__mocks__/markdown-tables-to-json.js',
     '^vanilla-picker$': '<rootDir>/__mocks__/vanilla-picker.js',
     '\\.svelte$': '<rootDir>/__mocks__/svelte.js',
     '^src/(.*)$': '<rootDir>/src/$1',
   },
-  transformIgnorePatterns: [
-    '/node_modules/(?!chart\\.js|chroma-js|markdown-tables-to-json|vanilla-picker)/'
-  ],
+  transformIgnorePatterns: [],
   roots: ['<rootDir>/src', '<rootDir>/tests']
 };
 

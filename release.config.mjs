@@ -1,7 +1,6 @@
 import esbuild from "esbuild";
 import sveltePlugin from "esbuild-svelte";
 import process from "process";
-import autoPreprocess from "svelte-preprocess";
 
 const banner = 
 `/*
@@ -19,7 +18,6 @@ esbuild.build({
     external: ['obsidian', 'moment'],
     format: 'cjs',
     minify: true,
-    watch: false,
     logLevel: "info",
     treeShaking: true,
     plugins: [sveltePlugin({
@@ -27,7 +25,6 @@ esbuild.build({
             css: true,
             dev: false,
         },
-        preprocess: autoPreprocess(),
     })],
     outfile: 'main.js',
 }).catch(() => process.exit(1));

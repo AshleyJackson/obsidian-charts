@@ -1,7 +1,7 @@
 import {
   DEFAULT_SETTINGS,
-  ImageOptions,
 } from './../constants/settingsConstants';
+import type { ImageOptions } from './../constants/settingsConstants';
 import {
   App,
   MarkdownRenderer,
@@ -168,7 +168,7 @@ export class ChartSettingTab extends PluginSettingTab {
         });
         cb.setValue(plugin.settings.imageSettings.format);
         cb.onChange(async (value) => {
-          (plugin.settings.imageSettings.format as any) = value;
+          plugin.settings.imageSettings.format = value as ImageOptions['format'];
           await plugin.saveSettings();
         });
       });

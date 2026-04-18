@@ -76,6 +76,7 @@ bestFitNumber: ${bestFitNumber}`;
   <div class="modalColumn">
     <div>
       <table style="width:100%">
+        <tbody>
         <tr>
           <td class="desc"
             ><p class="mainDesc">Chart Type</p>
@@ -163,9 +164,11 @@ bestFitNumber: ${bestFitNumber}`;
             /></td
           >
         </tr>
+        </tbody>
       </table>
       <hr />
       <table style="width:100%">
+        <tbody>
         <tr>
           <td class="desc"
             ><p class="mainDesc">X Axis</p>
@@ -179,9 +182,11 @@ bestFitNumber: ${bestFitNumber}`;
             /><br />
           </td>
         </tr>
+        </tbody>
       </table>
       <hr />
       <table style="width:100%">
+        <tbody>
         {#each data as d, i}
           <tr>
             <td class="desc"
@@ -200,17 +205,19 @@ bestFitNumber: ${bestFitNumber}`;
             </td>
           </tr>
         {/each}
-        <div class="addMoreButtonContainer">
-          <button
-            on:click={() => (data = [...data, { data: "", dataTitle: "" }])}
-            >Add more</button
-          >
-        </div>
+        </tbody>
       </table>
+      <div class="addMoreButtonContainer">
+        <button
+          on:click={() => (data = [...data, { data: "", dataTitle: "" }])}
+          >Add more</button
+        >
+      </div>
       <hr />
       <CollapsibleSection headerText={'Line of Best Fit (Line chart only)'} >
         <hr>
       <table style="width:100%">
+        <tbody>
         <tr>
           <td class="desc"
           ><p class="mainDesc">Line of Best Fit</p>
@@ -248,6 +255,7 @@ bestFitNumber: ${bestFitNumber}`;
                   bind:value={bestFitTitle}
           /><br />
         </tr>
+        </tbody>
       </table>
         </CollapsibleSection>
     </div>

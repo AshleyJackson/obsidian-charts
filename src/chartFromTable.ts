@@ -1,4 +1,5 @@
 import { Editor, Notice } from 'obsidian';
+// @ts-ignore - markdown-tables-to-json lacks type declarations; see src/types.d.ts for ambient declaration
 import { Extractor } from "markdown-tables-to-json";
 import { DateTime } from 'luxon';
 import type { DataField } from 'src/constants/settingsConstants';
@@ -54,19 +55,53 @@ beginAtZero: true
   console.log('Charts: Replaced selection with chart code');
 }
 
-export function generateTableData(table: string, layout: 'columns' | 'rows', selected?: string[]) {
+export function generateTableData(table: string, layout: 'columns' | 'rows', selected?: string[]): { labels: string[]; dataFields: DataField[] } {
   console.log('Charts: Generating table data with layout:', layout, 'table length:', table.length);
-  let fields: any;
+
+  // Preserve escaped pipes in wikilinks (e.g., [[Page|Alias]]) before parsing.
+  // The markdown parser treats \| as a table delimiter, splitting the cell.
+  // We temporarily replace \| inside [[...]] with a placeholder, then restore after parsing.
+  const PIPE_PLACEHOLDER = '\x00WIKILINK_PIPE\x00';
+  const tableWithPlaceholders = table.replace(/\[\[([^\]]*?)\\\|([^\]]*?)\]\]/g, (_match: string, before: string, after: string) => {
+    return `[[${before}${PIPE_PLACEHOLDER}${after}]]`;
+  });
+
+  let fields: Record<string, Record<string, string>>;
   try {
-    fields = Extractor.extractObject(table, layout, false);
+    const extracted = Extractor.extractObject(tableWithPlaceholders, layout, false);
+    if (!extracted) {
+      throw new Error("Table extraction returned null");
+    }
+    fields = extracted;
     console.log('Charts: Extracted fields keys:', Object.keys(fields));
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Charts: Error extracting table:', error);
-    new Notice('Table malformed')
+    new Notice('Table malformed');
     throw error;
   }
-  
-  let labels = Object.keys(Object.values(fields)[0]);
+
+  // Restore escaped pipes in the extracted data
+  const restorePipes = (str: string): string => str.replace(new RegExp(PIPE_PLACEHOLDER, 'g'), '|');
+  const restoreInObject = (obj: unknown): unknown => {
+    if (typeof obj === 'string') return restorePipes(obj);
+    if (Array.isArray(obj)) return obj.map(restoreInObject);
+    if (obj && typeof obj === 'object') {
+      const restored: Record<string, unknown> = {};
+      for (const key of Object.keys(obj as Record<string, unknown>)) {
+        const restoredKey = restorePipes(key);
+        restored[restoredKey] = restoreInObject((obj as Record<string, unknown>)[key]);
+      }
+      return restored;
+    }
+    return obj;
+  };
+  fields = restoreInObject(fields) as Record<string, Record<string, string>>;
+
+  const firstEntry = Object.values(fields)[0];
+  if (!firstEntry) {
+    throw new Error("No data found in table");
+  }
+  let labels = Object.keys(firstEntry);
   console.log('Charts: Extracted labels:', labels);
   
   let dataFields: DataField[] = Object.keys(fields).map((key) => {
