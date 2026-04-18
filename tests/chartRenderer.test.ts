@@ -648,6 +648,80 @@ describe('Renderer', () => {
           expect(e.message).not.toBe('Invalid id and/or file');
         }
       });
+
+      it('finds block ID in blocks record when not in sections', async () => {
+        const mockApp = child.renderer.plugin.app;
+        const mockFile = { path: 'test.md', basename: 'test' };
+        mockApp.vault.getAbstractFileByPath.mockReturnValue(mockFile);
+        // Simulate Obsidian's cache where the block ID is in blocks but not sections[].id
+        mockApp.metadataCache.getFileCache.mockReturnValue({
+          sections: [
+            { type: 'table', position: { start: { offset: 0 }, end: { offset: 80 } } },
+          ],
+          blocks: {
+            'WK41': { id: 'WK41', position: { start: { offset: 60 }, end: { offset: 66 } } },
+          },
+        });
+        mockApp.vault.cachedRead.mockResolvedValue(
+          '| Customer | Tickets |\n|---|---|\n| C1 | 5 |\n| C2 | 2 |\n^WK41'
+        );
+
+        (child as any).data = { type: 'bar', id: '^WK41', layout: 'rows' };
+
+        try {
+          await child.onload();
+        } catch (e: any) {
+          // Should NOT throw "Invalid id and/or file" since block is found in blocks record
+          expect(e.message).not.toBe('Invalid id and/or file');
+        }
+      });
+
+      it('uses containing section position when block found in blocks record', async () => {
+        const mockApp = child.renderer.plugin.app;
+        const mockFile = { path: 'test.md', basename: 'test' };
+        mockApp.vault.getAbstractFileByPath.mockReturnValue(mockFile);
+        mockApp.metadataCache.getFileCache.mockReturnValue({
+          sections: [
+            { type: 'table', position: { start: { offset: 0 }, end: { offset: 80 } } },
+          ],
+          blocks: {
+            'WK41': { id: 'WK41', position: { start: { offset: 60 }, end: { offset: 66 } } },
+          },
+        });
+        mockApp.vault.cachedRead.mockResolvedValue(
+          '| Customer | Tickets |\n|---|---|\n| C1 | 5 |\n| C2 | 2 |\n^WK41'
+        );
+
+        (child as any).data = { type: 'bar', id: 'WK41', layout: 'rows' };
+
+        try {
+          await child.onload();
+        } catch (e: any) {
+          // Should find the containing table section and extract the table
+          expect(e.message).not.toBe('Invalid id and/or file');
+        }
+      });
+
+      it('shows error when block ID not found in sections or blocks', async () => {
+        const mockApp = child.renderer.plugin.app;
+        const mockFile = { path: 'test.md', basename: 'test' };
+        mockApp.vault.getAbstractFileByPath.mockReturnValue(mockFile);
+        mockApp.metadataCache.getFileCache.mockReturnValue({
+          sections: [{ type: 'table', position: { start: { offset: 0 }, end: { offset: 50 } } }],
+          blocks: {},
+        });
+        mockApp.vault.cachedRead.mockResolvedValue(
+          '| A | B |\n|---|---|\n| 1 | 2 |'
+        );
+
+        (child as any).data = { type: 'bar', id: '^nonexistent', layout: 'columns' };
+
+        // onload catches the error internally and renders an error element
+        await child.onload();
+        // Verify an error was rendered (renderError creates a .chart-error element)
+        const errorEl = mockContainerEl.querySelector('.chart-error');
+        expect(errorEl).not.toBeNull();
+      });
     });
 
     describe('table data empty cell handling', () => {

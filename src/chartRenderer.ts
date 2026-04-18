@@ -9,7 +9,7 @@ import type { ImageOptions } from './constants/settingsConstants';
 import type ChartPlugin from 'src/main';
 import { generateTableData } from 'src/chartFromTable';
 import annotationPlugin from 'chartjs-plugin-annotation';
-import type { ChartYaml, DatasetPrepResult, SankeyFlowItem, FileCacheSection } from './types';
+import type { ChartYaml, DatasetPrepResult, SankeyFlowItem, FileCacheSection, FileCacheBlock } from './types';
 
 Chart.register(...registerables, annotationPlugin, SankeyController, Flow);
 
@@ -359,8 +359,27 @@ export class ChartRenderChild extends MarkdownRenderChild {
           throw new Error("Cache not found");
         }
         const sections = (fileCache.sections as FileCacheSection[] | undefined) ?? [];
+        const blocks = (fileCache.blocks as Record<string, FileCacheBlock> | undefined) ?? {};
         const blockId = this.data.id.startsWith('^') ? this.data.id.slice(1) : this.data.id;
-        const pos = sections.find(section => section.id === blockId)?.position;
+        // Try sections first (where section.id is populated), then fall back to blocks record
+        let pos = sections.find(section => section.id === blockId)?.position;
+        if (!pos) {
+          const block = blocks[blockId];
+          if (block) {
+            // blocks record points to the block ID line itself;
+            // find the containing section (typically the table) that encompasses it
+            const blockStart = block.position.start.offset;
+            const containingSection = sections.find(section =>
+              section.position.start.offset <= blockStart && section.position.end.offset >= blockStart
+            );
+            if (containingSection) {
+              pos = containingSection.position;
+            } else {
+              // Fallback: use the block's own position (may include just the ^id line)
+              pos = block.position;
+            }
+          }
+        }
         if (!pos) {
           throw new Error("Invalid id and/or file");
         }

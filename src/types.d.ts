@@ -75,6 +75,16 @@ export interface SankeyFlowItem {
 /** File cache section from Obsidian metadata */
 export interface FileCacheSection {
   id?: string;
+  type?: string;
+  position: {
+    start: { offset: number };
+    end: { offset: number };
+  };
+}
+
+/** File cache block entry from Obsidian metadata */
+export interface FileCacheBlock {
+  id: string;
   position: {
     start: { offset: number };
     end: { offset: number };
@@ -84,6 +94,7 @@ export interface FileCacheSection {
 /** File cache from Obsidian metadata */
 export interface FileCache {
   sections?: FileCacheSection[];
+  blocks?: Record<string, FileCacheBlock>;
 }
 
 /** Chart dataset for table-linked charts and standard charts */
