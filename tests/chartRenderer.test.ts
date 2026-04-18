@@ -114,6 +114,69 @@ describe('Renderer', () => {
       });
     });
 
+    it('prepares candlestick chart data with OHLC array conversion', async () => {
+      const yaml = {
+        type: 'candlestick',
+        labels: ['Mon', 'Tue', 'Wed'],
+        series: [{
+          title: 'AAPL',
+          data: [[150, 155, 148, 152], [152, 158, 150, 156], [156, 160, 154, 158]],
+        }],
+      };
+      const result = await renderer.datasetPrep(yaml, mockEl);
+      expect(result.chartOptions.type).toBe('candlestick');
+      expect(result.chartOptions.data.datasets[0].data).toEqual([
+        { o: 150, h: 155, l: 148, c: 152 },
+        { o: 152, h: 158, l: 150, c: 156 },
+        { o: 156, h: 160, l: 154, c: 158 },
+      ]);
+    });
+
+    it('prepares ohlc chart data with OHLC array conversion', async () => {
+      const yaml = {
+        type: 'ohlc',
+        labels: ['Mon', 'Tue'],
+        series: [{
+          title: 'GOOG',
+          data: [[100, 110, 95, 105], [105, 115, 100, 112]],
+        }],
+      };
+      const result = await renderer.datasetPrep(yaml, mockEl);
+      expect(result.chartOptions.type).toBe('ohlc');
+      expect(result.chartOptions.data.datasets[0].data).toEqual([
+        { o: 100, h: 110, l: 95, c: 105 },
+        { o: 105, h: 115, l: 100, c: 112 },
+      ]);
+    });
+
+    it('passes through OHLC object data unchanged for candlestick', async () => {
+      const yaml = {
+        type: 'candlestick',
+        labels: ['Mon'],
+        series: [{
+          title: 'AAPL',
+          data: [{ o: 150, h: 155, l: 148, c: 152 }],
+        }],
+      };
+      const result = await renderer.datasetPrep(yaml, mockEl);
+      expect(result.chartOptions.data.datasets[0].data[0]).toEqual({
+        o: 150, h: 155, l: 148, c: 152,
+      });
+    });
+
+    it('configures y-axis for candlestick charts', async () => {
+      const yaml = {
+        type: 'candlestick',
+        labels: ['Mon'],
+        series: [{ title: 'AAPL', data: [[150, 155, 148, 152]] }],
+        yMin: 140,
+        yMax: 160,
+      };
+      const result = await renderer.datasetPrep(yaml, mockEl);
+      expect(result.chartOptions.options.scales.y.min).toBe(140);
+      expect(result.chartOptions.options.scales.y.max).toBe(160);
+    });
+
     it('passes sankey non-array data items through unchanged', async () => {
       const yaml = {
         type: 'sankey',

@@ -17,15 +17,18 @@ obsidian-charts/
 │   ├── date-adapter/       # Moment.js adapter for Chart.js
 │   └── ui/                 # UI components (Svelte + TypeScript)
 ├── tests/                  # Jest test files
-│   ├── main.test.ts        # Plugin tests
-│   ├── chartRenderer.test.ts # Renderer tests
-│   ├── chartFromTable.test.ts # Table conversion tests
+│   ├── main.test.ts        # Plugin + window.renderChart API tests
+│   ├── chartRenderer.test.ts # Renderer + ChartRenderChild tests
+│   ├── chartFromTable.test.ts # Table conversion + empty cell tests
 │   └── setup.ts            # Jest setup (canvas mock, ResizeObserver)
 ├── __mocks__/              # Jest mocks for external modules
 │   ├── obsidian.js         # Mock for obsidian package (type-only)
-│   ├── chart.js            # Mock for Chart.js
+│   ├── chart.js            # Mock for Chart.js v4
 │   ├── chartjs-chart-sankey.js # Mock for Sankey controller
+│   ├── chartjs-chart-financial.js # Mock for candlestick/OHLC
 │   ├── chartjs-plugin-annotation.js # Mock for annotation plugin
+│   ├── chroma-js.js        # Mock for chroma-js v3 (ESM-only)
+│   ├── markdown-tables-to-json.js # Mock for table parser
 │   ├── date-adapter.js     # Mock for date adapter
 │   ├── vanilla-picker.js   # Mock for color picker
 │   └── svelte.js           # Mock for Svelte components
@@ -49,7 +52,13 @@ Date detection uses **Luxon** library (`DateTime.fromISO()` and `DateTime.fromFo
 **Dependencies:** `luxon` (runtime), `@types/luxon` (dev)
 
 ### Block ID Linking
-Charts can link to tables using block IDs. The ID format uses `^` prefix in YAML (e.g., `id: ^my-table`) but Obsidian's cache stores IDs without the prefix. The code strips the leading `^` when searching `fileCache.sections`.
+Charts can link to tables using block IDs. The ID format uses `^` prefix in YAML (e.g., `id: ^my-table`) but Obsidian's cache stores IDs without the prefix. The code strips the leading `^` when searching for the block ID.
+
+**Block ID lookup strategy:** The code searches two locations in Obsidian's `fileCache`:
+1. `fileCache.sections[].id` — section cache entries may have an `id` field
+2. `fileCache.blocks[blockId]` — the canonical block registry (more reliable)
+
+When a block ID is found in `blocks` but not in `sections`, the code finds the containing section (the table) by checking which section's position range encompasses the block's position. This ensures the full table content is extracted.
 
 Block IDs that follow tables in reading mode are automatically hidden via CSS in `styles.css`. This prevents the `^table-id` link from being visually disruptive below linked tables.
 
@@ -68,14 +77,36 @@ The `bestFit` modifier computes a linear regression line of best fit for line ch
 - `bestFitTitle: <string>` - Custom title for the best fit series (default: "Line of Best Fit")
 - Computation uses linear regression: `y = gradient * i + intercept`
 
-### String Data Auto-Conversion
-YAML parsing can return numeric values as strings (e.g., `"5"` instead of `5`). Both `datasetPrep()` and the table-linked chart path in `ChartRenderChild.onload()` automatically convert string data values to numbers using `parseFloat()`. This ensures chart rendering works correctly regardless of YAML input format.
+### String Data Auto-Conversion and Null Handling
+YAML parsing can return numeric values as strings (e.g., `"5"` instead of `5`). Both `datasetPrep()` and the table-linked chart path in `ChartRenderChild.onload()` automatically convert data values:
+- **Valid numeric strings** → converted to numbers via `parseFloat()`
+- **Empty strings** → converted to `null` (not `NaN` or `0`)
+- **Whitespace-only strings** → converted to `null`
+- **Non-numeric strings** → converted to `null`
+- **OHLC data points** (objects or arrays) → passed through unchanged
+
+Empty cells becoming `null` (instead of `NaN`) is critical for `spanGaps` support — Chart.js requires `null` values to properly bridge gaps; `NaN` is treated differently (often rendered as 0 or breaking the gap span).
 
 ### Canvas Dimensions for Image Export
 The `imageRenderer()` method respects the `width` property from YAML when generating chart images. It parses pixel values (`600px`), numeric values (`600`), and rejects percentage values (falls back to default `600px`). The height is calculated at a 2:1 aspect ratio. Previously, canvas dimensions were not set from YAML, resulting in default/small image exports.
 
 ### Debounced Chart Reload
 `ChartRenderChild` uses a debounced reload mechanism (500ms) when metadata changes are detected for linked charts. This prevents rapid successive reloads when a file is being edited, which could cause rendering issues or performance problems. The debounce timer is properly cleaned up in `onunload()`.
+
+### window.renderChart API (Dataview Integration)
+`window.renderChart(data, element)` is the public API for rendering charts from JavaScript (e.g., DataviewJS). It supports two input formats:
+
+1. **YAML-like objects** (with `series` key) — automatically routed through `datasetPrep()`, so `fill`, `stacked`, `spanGaps`, `beginAtZero`, color generation, etc. are all handled. This allows Dataview users to use the same YAML schema as code block charts.
+2. **Raw Chart.js `ChartConfiguration`** (with `data.datasets`) — passed directly to `renderRaw()` for maximum flexibility.
+
+This dual-path design fixes the issue where `stacked: true` and `fill: true` were silently ignored when passed as YAML-like objects via the JS API.
+
+### Candlestick and OHLC Charts
+Financial chart types `candlestick` and `ohlc` are supported via `chartjs-chart-financial` v0.2.1. Data can be provided in two formats:
+- **Array format**: `[open, high, low, close]` — automatically converted to `{o, h, l, c}` objects
+- **Object format**: `{o: 150, h: 155, l: 148, c: 152}` — passed through unchanged
+
+Both types support `yMin`/`yMax` axis modifiers.
 
 ## Testing Architecture
 
@@ -87,6 +118,7 @@ The `obsidian` npm package is **type definitions only** - it provides no runtime
 - `obsidian` - Type-only package, needs runtime mock
 - `chart.js` - v4: Complex DOM/Canvas dependencies, ESM. Mock provides Chart constructor, defaults, registerables
 - `chartjs-chart-sankey` - v0.14: ESM-only. Mock provides SankeyController and Flow classes
+- `chartjs-chart-financial` - v0.2.1: ESM-only. Mock provides CandlestickController, CandlestickElement, OhlcController, OhlcElement
 - `chartjs-plugin-annotation` - v3: ESM-only. Mock provides annotation plugin object
 - `chroma-js` - v3: ESM-only, returns 8-digit hex with alpha. Mock provides functional color API
 - `markdown-tables-to-json` - Dependency `@ts-stack/markdown` is ESM-only. Mock provides working table parser
@@ -107,6 +139,7 @@ The `obsidian` npm package is **type definitions only** - it provides no runtime
     '^obsidian$': '<rootDir>/__mocks__/obsidian.js',
     '^chart\\.js(/.*)?$': '<rootDir>/__mocks__/chart.js',
     '^chartjs-chart-sankey$': '<rootDir>/__mocks__/chartjs-chart-sankey.js',
+    '^chartjs-chart-financial$': '<rootDir>/__mocks__/chartjs-chart-financial.js',
     '^chartjs-plugin-annotation$': '<rootDir>/__mocks__/chartjs-plugin-annotation.js',
     '^chroma-js$': '<rootDir>/__mocks__/chroma-js.js',  // ESM-only in v3
     '^markdown-tables-to-json$': '<rootDir>/__mocks__/markdown-tables-to-json.js',  // @ts-stack/markdown is ESM
@@ -125,7 +158,7 @@ The `obsidian` npm package is **type definitions only** - it provides no runtime
 Obsidian extends HTMLElement with helper methods (`createEl`, `createDiv`, `empty`). Tests must add these to the prototype:
 
 ```typescript
-// In chartRenderer.test.ts
+// In tests/setup.ts
 HTMLElement.prototype.createEl = function(tag: string, opts?: any): HTMLElement {
   const el = document.createElement(tag);
   if (opts?.cls) el.className = opts.cls;
@@ -150,16 +183,21 @@ Tests the main plugin class:
 - Best fit line computation (linear regression)
 - Best fit with custom title and line number selection
 - Best fit with string data values (auto-conversion to numbers)
+- `window.renderChart` API — routes YAML-like objects through `datasetPrep()`, passes raw Chart.js config directly, handles stacked/fill correctly
 
 ### chartRenderer.test.ts
 Tests chart rendering:
-- `datasetPrep()` - Prepares chart data from YAML
+- `datasetPrep()` - Prepares chart data from YAML for all chart types
 - `renderRaw()` - Renders chart to DOM element
 - `imageRenderer()` - Generates image from chart
-- String data auto-conversion to numbers
+- Data conversion: string→number, empty string→null, whitespace→null, non-numeric→null
+- Null value preservation for spanGaps
+- OHLC array→object conversion for candlestick/ohlc charts
 - `stepped` property passed through to datasets
 - Canvas dimensions set from YAML width property
 - Debounced reload on metadata changes
+- Block ID lookup via `sections` and `blocks` record fallback
+- Containing section resolution when block found in `blocks` record
 
 ### chartFromTable.test.ts
 Tests table-to-chart conversion:
@@ -167,6 +205,8 @@ Tests table-to-chart conversion:
 - `generateTableData()` - Parses markdown table to data
 - **Date auto-transpose** - Detects date fields and transposes for time series
 - Block ID lookup with leading `^` prefix handling
+- Empty cell preservation (empty strings in data output)
+- Wikilink alias pipe escaping
 
 ## Key Mock Implementations
 
@@ -222,10 +262,16 @@ The real package depends on `@ts-stack/markdown` which is ESM-only and incompati
 **Solution:** Ensure the mock exports all classes that source code extends (e.g., `Modal`, `PluginSettingTab`).
 
 ### Issue: "Invalid id and/or file" for linked charts
-**Solution:** Block IDs in YAML use `^` prefix (e.g., `^my-table`), but Obsidian's cache stores IDs without it. The code strips the leading `^` when searching.
+**Solution:** Block IDs in YAML use `^` prefix (e.g., `^my-table`), but Obsidian's cache stores IDs without it. The code strips the leading `^` when searching. If the block ID is not found in `fileCache.sections[].id`, it falls back to `fileCache.blocks[blockId]` and resolves the containing section for the full table content.
 
 ### Issue: Time series chart shows many series instead of one
 **Solution:** Date auto-transpose feature handles this automatically. If field keys are date-like, data is transposed so dates become X-axis labels.
+
+### Issue: spanGaps shows empty cells as 0 instead of bridging gaps
+**Solution:** Empty cells from tables are now converted to `null` (not `NaN` or `0`). Chart.js `spanGaps` requires `null` values to properly bridge gaps. `parseFloat("")` returns `NaN` which is wrong — the code now checks for empty/whitespace/non-numeric strings and converts them to `null`.
+
+### Issue: Stacked/fill options ignored in window.renderChart (Dataview)
+**Solution:** `window.renderChart` now detects YAML-like objects (with `series` key) and routes them through `datasetPrep()`. Raw Chart.js configs (with `data.datasets`) pass through directly. Use the `series` format to get automatic handling of `fill`, `stacked`, `spanGaps`, etc.
 
 ## Adding New Tests
 
@@ -284,6 +330,7 @@ it('parses European date format DD-MM-YYYY', () => {
 **Production:**
 - `chart.js` - v4: Chart rendering library (ESM)
 - `chartjs-chart-sankey` - v0.14: Sankey diagram support (ESM)
+- `chartjs-chart-financial` - v0.2.1: Candlestick and OHLC chart types (ESM)
 - `chartjs-plugin-annotation` - v3: Chart annotations (ESM)
 - `chroma-js` - v3: Color manipulation (ESM, returns 8-digit hex with alpha)
 - `luxon` - Date parsing and validation
@@ -302,11 +349,11 @@ it('parses European date format DD-MM-YYYY', () => {
 ## Notes for Future Agents
 
 1. **Don't remove mocks** - The obsidian mock is essential since the package is type-only
-2. **ESM-only packages** - chart.js v4, chroma-js v3, chartjs-chart-sankey v0.14, chartjs-plugin-annotation v3, and @ts-stack/markdown (dep of markdown-tables-to-json) are all ESM-only. They must be mocked in `moduleNameMapper` rather than transformed
+2. **ESM-only packages** - chart.js v4, chroma-js v3, chartjs-chart-sankey v0.14, chartjs-chart-financial v0.2.1, chartjs-plugin-annotation v3, and @ts-stack/markdown (dep of markdown-tables-to-json) are all ESM-only. They must be mocked in `moduleNameMapper` rather than transformed
 3. **Extend HTMLElement** - Add Obsidian's helper methods to the prototype (done in `tests/setup.ts`)
 4. **Date auto-transpose** - Tables with date keys are automatically transposed for time series
-5. **Block IDs** - Strip `^` prefix when searching Obsidian's fileCache.sections
-6. **String data values** - YAML may parse numbers as strings; code auto-converts via `parseFloat()`
+5. **Block IDs** - Strip `^` prefix when searching; search both `fileCache.sections[].id` AND `fileCache.blocks[blockId]`, with containing section resolution for the latter
+6. **Empty cells → null** - Empty/whitespace/non-numeric strings become `null` (not `NaN` or `0`); critical for `spanGaps` to work correctly
 7. **Debounced reload** - Chart reload on metadata change uses 500ms debounce; timer must be cleaned up in `onunload()`
 8. **Canvas dimensions** - Image export respects YAML `width` property; percentage widths default to 600px for images
 9. **Best fit computation** - Uses linear regression on index positions (i) vs data values (y); computed in postprocessor before rendering
@@ -315,3 +362,7 @@ it('parses European date format DD-MM-YYYY', () => {
 12. **chroma-js v3 alpha** - Returns 8-digit hex (e.g., `#ff000040`) instead of rgba; Chart.js v4 accepts this
 13. **TypeScript 6** - Requires `"ignoreDeprecations": "6.0"` in tsconfig and `"moduleResolution": "bundler"` in jest.tsconfig
 14. **Always update tests** - When adding features, add corresponding tests in the same session
+15. **window.renderChart dual-path** - YAML-like objects (with `series`) are routed through `datasetPrep()`; raw Chart.js configs pass through directly. This ensures `fill`, `stacked`, etc. work via the JS API
+16. **Candlestick/OHLC data format** - Array `[o, h, l, c]` is auto-converted to `{o, h, l, c}` object; OHLC objects pass through unchanged
+17. **chart.js v4 generic types** - Chart.js v4's `ChartConfiguration` and `ChartDataset` use deeply parameterized generics that can't be satisfied by custom interfaces. Use `Record<string, unknown>[]` for internal datasets and cast through `unknown` at the `ChartConfiguration` boundary with `as unknown as ChartConfiguration`
+18. **No `any` types** - The codebase must not use `any`. Use `unknown` at chart.js boundaries and proper typed interfaces elsewhere. `@ts-ignore` is acceptable only for packages lacking type declarations (markdown-tables-to-json, .svelte imports)

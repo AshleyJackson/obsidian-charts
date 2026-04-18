@@ -94,6 +94,8 @@ bestFitNumber: ${bestFitNumber}`;
               <option value="doughnut">Doughnut</option>
               <option value="radar">Radar</option>
               <option value="polarArea">Polar Area</option>
+              <option value="candlestick">Candlestick</option>
+              <option value="ohlc">OHLC</option>
             </select></td
           >
         </tr>

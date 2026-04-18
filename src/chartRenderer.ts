@@ -1,6 +1,7 @@
 import { Chart, registerables } from 'chart.js';
 import type { ChartConfiguration } from 'chart.js';
 import { SankeyController, Flow } from 'chartjs-chart-sankey';
+import { CandlestickController, CandlestickElement, OhlcController, OhlcElement } from 'chartjs-chart-financial';
 import './date-adapter/chartjs-adapter-moment.esm.js';
 import { MarkdownRenderChild, parseYaml, TFile } from 'obsidian';
 import type { MarkdownPostProcessorContext } from 'obsidian';
@@ -9,9 +10,9 @@ import type { ImageOptions } from './constants/settingsConstants';
 import type ChartPlugin from 'src/main';
 import { generateTableData } from 'src/chartFromTable';
 import annotationPlugin from 'chartjs-plugin-annotation';
-import type { ChartYaml, DatasetPrepResult, SankeyFlowItem, FileCacheSection, FileCacheBlock } from './types';
+import type { ChartYaml, DatasetPrepResult, SankeyFlowItem, FileCacheSection, FileCacheBlock, OhlcDataPoint } from './types';
 
-Chart.register(...registerables, annotationPlugin, SankeyController, Flow);
+Chart.register(...registerables, annotationPlugin, SankeyController, Flow, CandlestickController, CandlestickElement, OhlcController, OhlcElement);
 
 export default class Renderer {
   plugin: ChartPlugin;
@@ -46,9 +47,11 @@ export default class Renderer {
         const { title, ...rest } = seriesList[i];
         // Ensure data values are numbers - YAML parsing can return strings
         // Empty strings become null so spanGaps and Chart.js handle them correctly
+        // OHLC data points (objects/arrays) pass through unchanged
         if (rest.data && Array.isArray(rest.data)) {
-          rest.data = rest.data.map((v: number | string | null) => {
+          rest.data = rest.data.map((v: number | string | null | OhlcDataPoint | [number, number, number, number]) => {
             if (v === null || v === undefined) return null;
+            if (typeof v === 'object') return v; // OHLC data points or arrays pass through
             if (typeof v === 'string') {
               const trimmed = v.trim();
               if (trimmed === '') return null;
@@ -212,6 +215,46 @@ export default class Renderer {
         options: {
           animation: {
             duration: 0,
+          },
+        },
+      } as unknown as ChartConfiguration;
+    } else if (yaml.type === 'candlestick' || yaml.type === 'ohlc') {
+      console.log('Charts: Configuring financial chart for type:', yaml.type);
+      // Financial charts use {o, h, l, c} data points
+      const financialDatasets = datasets.map(dataset => {
+        return {
+          ...dataset,
+          data: (dataset.data as Array<unknown>).map(item => {
+            if (typeof item === 'object' && item !== null && !Array.isArray(item)) {
+              return item;
+            }
+            // If data is an array [open, high, low, close], convert to object
+            if (Array.isArray(item) && item.length >= 4) {
+              return { o: item[0], h: item[1], l: item[2], c: item[3] };
+            }
+            return item;
+          }),
+        };
+      });
+
+      chartOptions = {
+        type: yaml.type,
+        data: {
+          labels,
+          datasets: financialDatasets,
+        },
+        options: {
+          animation: {
+            duration: 0,
+          },
+          scales: {
+            x: {
+              type: 'category',
+            },
+            y: {
+              min: yaml.yMin,
+              max: yaml.yMax,
+            },
           },
         },
       } as unknown as ChartConfiguration;

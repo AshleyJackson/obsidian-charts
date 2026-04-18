@@ -19,6 +19,7 @@ const config = {
     '^./date-adapter/chartjs-adapter-moment.esm.js$': '<rootDir>/__mocks__/date-adapter.js',
     '^chart\\.js(/.*)?$': '<rootDir>/__mocks__/chart.js',
     '^chartjs-chart-sankey$': '<rootDir>/__mocks__/chartjs-chart-sankey.js',
+    '^chartjs-chart-financial$': '<rootDir>/__mocks__/chartjs-chart-financial.js',
     '^chartjs-plugin-annotation$': '<rootDir>/__mocks__/chartjs-plugin-annotation.js',
     '^chroma-js$': '<rootDir>/__mocks__/chroma-js.js',
     '^markdown-tables-to-json$': '<rootDir>/__mocks__/markdown-tables-to-json.js',

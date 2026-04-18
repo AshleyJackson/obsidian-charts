@@ -49,10 +49,18 @@ export interface ChartYaml {
   bestFitTitle?: string;
 }
 
+/** OHLC data point for candlestick/ohlc charts */
+export interface OhlcDataPoint {
+  o: number;  // open
+  h: number;  // high
+  l: number;  // low
+  c: number;  // close
+}
+
 /** Single series entry in chart YAML */
 export interface ChartSeries {
   title?: string;
-  data: (number | string | null)[];
+  data: (number | string | null | OhlcDataPoint | [number, number, number, number])[];
   colorFrom?: Record<string, string>;
   colorTo?: Record<string, string>;
   priority?: Record<string, number>;
