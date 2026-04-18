@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - master
+
+concurrency:
+  group: release
+  cancel-in-progress: false
 jobs:
   check-release-needed:
     if: github.event_name == 'push'
