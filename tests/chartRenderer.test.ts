@@ -141,6 +141,48 @@ describe('Renderer', () => {
       expect(result.chartOptions.data.datasets[0].data).toEqual([12, 28, 25]);
     });
 
+    it('converts empty string data values to null for spanGaps', async () => {
+      const yaml = {
+        type: 'line',
+        labels: ['A', 'B', 'C', 'D'],
+        series: [{ title: 'S1', data: [5, '', 10, 15] }],
+        spanGaps: true,
+      };
+      const result = await renderer.datasetPrep(yaml, mockEl);
+      expect(result.chartOptions.data.datasets[0].data).toEqual([5, null, 10, 15]);
+    });
+
+    it('converts whitespace-only string data values to null', async () => {
+      const yaml = {
+        type: 'line',
+        labels: ['A', 'B', 'C'],
+        series: [{ title: 'S1', data: ['  ', '5', '  '] }],
+      };
+      const result = await renderer.datasetPrep(yaml, mockEl);
+      expect(result.chartOptions.data.datasets[0].data).toEqual([null, 5, null]);
+    });
+
+    it('converts non-numeric string data values to null', async () => {
+      const yaml = {
+        type: 'line',
+        labels: ['A', 'B', 'C'],
+        series: [{ title: 'S1', data: ['abc', '5', 'xyz'] }],
+      };
+      const result = await renderer.datasetPrep(yaml, mockEl);
+      expect(result.chartOptions.data.datasets[0].data).toEqual([null, 5, null]);
+    });
+
+    it('preserves null values in data array', async () => {
+      const yaml = {
+        type: 'line',
+        labels: ['A', 'B', 'C', 'D'],
+        series: [{ title: 'S1', data: [1, null, null, 4] }],
+        spanGaps: true,
+      };
+      const result = await renderer.datasetPrep(yaml, mockEl);
+      expect(result.chartOptions.data.datasets[0].data).toEqual([1, null, null, 4]);
+    });
+
     it('handles mixed string and numeric data values', async () => {
       const yaml = {
         type: 'bar',
@@ -604,6 +646,40 @@ describe('Renderer', () => {
           await child.onload();
         } catch (e: any) {
           expect(e.message).not.toBe('Invalid id and/or file');
+        }
+      });
+    });
+
+    describe('table data empty cell handling', () => {
+      it('converts empty cells to null for spanGaps support', async () => {
+        const mockApp = child.renderer.plugin.app;
+        const mockFile = { path: 'test.md', basename: 'test' };
+        mockApp.vault.getAbstractFileByPath.mockReturnValue(mockFile);
+        mockApp.metadataCache.getFileCache.mockReturnValue({
+          sections: [{ id: 'tabelle1', position: { start: { offset: 0 }, end: { offset: 200 } } }],
+        });
+        mockApp.vault.cachedRead.mockResolvedValue(
+          '| Datum | warm | kalt |\n|---|---|---|\n| 12.03 | 0 | 0 |\n| 13.03 | 5 | 8 |\n| 14.03 | 10 | 13 |\n| 15.03 |  | 18 |\n| 16.03 | 18 | 19 |\n| 17.03 | 25 | 21 |\n^tabelle1'
+        );
+
+        (child as any).data = { type: 'line', id: 'tabelle1', layout: 'columns', spanGaps: true };
+
+        try {
+          await child.onload();
+        } catch (_e: unknown) {
+          // May fail on rendering, but data conversion is what we're testing
+        }
+
+        // Verify Chart was called - the data should have null for empty cells
+        expect(Chart).toHaveBeenCalled();
+        const lastCall = (Chart as jest.Mock).mock.calls[(Chart as jest.Mock).mock.calls.length - 1];
+        const config = lastCall?.[1];
+        if (config?.data?.datasets) {
+          const warmData = config.data.datasets.find((d: Record<string, unknown>) => d.label === 'warm');
+          if (warmData) {
+            // The empty cell at row 4 (15.03) should be null, not 0 or NaN
+            expect(warmData.data[3]).toBeNull();
+          }
         }
       });
     });

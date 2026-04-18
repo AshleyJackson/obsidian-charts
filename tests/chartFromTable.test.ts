@@ -131,6 +131,27 @@ describe('generateTableData', () => {
     });
   });
 
+  describe('empty cell handling', () => {
+    it('preserves empty cells as empty strings in data output', () => {
+      const table = '| Datum | warm | kalt |\n|---|---|---|\n| 12.03 | 0 | 0 |\n| 15.03 |  | 18 |';
+      const result = generateTableData(table, 'columns');
+      // The warm series should have an empty string at index 1
+      const warmField = result.dataFields.find(f => f.dataTitle === 'warm');
+      expect(warmField).toBeDefined();
+      expect(warmField!.data[1]).toBe('');
+    });
+
+    it('preserves multiple empty cells across rows and columns', () => {
+      const table = '| Label | A | B |\n|---|---|---|\n| row1 | 1 |  |\n| row2 |  | 4 |';
+      const result = generateTableData(table, 'rows');
+      // In rows layout, first column values become dataField titles
+      const row1 = result.dataFields.find(f => f.dataTitle === 'row1');
+      const row2 = result.dataFields.find(f => f.dataTitle === 'row2');
+      expect(row1!.data[1]).toBe('');  // B column for row1 is empty
+      expect(row2!.data[0]).toBe('');  // A column for row2 is empty
+    });
+  });
+
   describe('date auto-transpose', () => {
     it('auto-transposes ISO date format (YYYY-MM-DD)', () => {
       const table = '| Date | Value |\n|------|-------|\n| 2026-03-17 | 5 |\n| 2026-03-18 | 3 |\n| 2026-03-19 | 7 |';

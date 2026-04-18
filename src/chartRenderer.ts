@@ -45,8 +45,18 @@ export default class Renderer {
       for (let i = 0; i < seriesList.length; i++) {
         const { title, ...rest } = seriesList[i];
         // Ensure data values are numbers - YAML parsing can return strings
+        // Empty strings become null so spanGaps and Chart.js handle them correctly
         if (rest.data && Array.isArray(rest.data)) {
-          rest.data = rest.data.map((v: number | string) => typeof v === 'string' ? parseFloat(v) : v);
+          rest.data = rest.data.map((v: number | string | null) => {
+            if (v === null || v === undefined) return null;
+            if (typeof v === 'string') {
+              const trimmed = v.trim();
+              if (trimmed === '') return null;
+              const num = parseFloat(trimmed);
+              return isNaN(num) ? null : num;
+            }
+            return v;
+          });
         }
         const dataset = {
           label: title ?? "",
@@ -368,7 +378,13 @@ export class ChartRenderChild extends MarkdownRenderChild {
         }
         chartData.labels = tableData.labels;
         for (let i = 0; i < tableData.dataFields.length; i++) {
-          const numericData = tableData.dataFields[i].data.map((v: string) => typeof v === 'string' ? parseFloat(v) : v);
+          // Convert string data to numbers; empty cells become null for proper spanGaps support
+          const numericData = tableData.dataFields[i].data.map((v: string) => {
+            const trimmed = v.trim();
+            if (trimmed === '') return null;
+            const num = parseFloat(trimmed);
+            return isNaN(num) ? null : num;
+          });
           chartData.datasets.push({
             label: tableData.dataFields[i].dataTitle ?? "",
             data: numericData,

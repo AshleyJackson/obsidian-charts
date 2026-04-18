@@ -52,7 +52,7 @@ export interface ChartYaml {
 /** Single series entry in chart YAML */
 export interface ChartSeries {
   title?: string;
-  data: (number | string)[];
+  data: (number | string | null)[];
   colorFrom?: Record<string, string>;
   colorTo?: Record<string, string>;
   priority?: Record<string, number>;
@@ -89,7 +89,7 @@ export interface FileCache {
 /** Chart dataset for table-linked charts and standard charts */
 export interface ChartDataset {
   label: string;
-  data: (number | string)[];
+  data: (number | string | null)[];
   backgroundColor: string | string[];
   borderColor: string | string[];
   borderWidth: number;

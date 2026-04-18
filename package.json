@@ -1,6 +1,6 @@
 {
   "name": "obsidian-charts",
-  "version": "4.0.0",
+  "version": "4.0.1",
   "description": "This Plugin lets you create Charts within Obsidian",
   "main": "main.js",
   "scripts": {
