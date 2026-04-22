@@ -1,6 +1,7 @@
 import ChartPlugin from '../src/main';
 import { parseYaml } from 'obsidian';
 import { Chart } from 'chart.js';
+import { preprocessYamlContent } from '../src/util';
 
 describe('Main Plugin', () => {
   let plugin: ChartPlugin;
@@ -274,5 +275,69 @@ describe('parseYaml mock', () => {
     const content = 'type: bar\ntension: 0.5\nbeginAtZero: true';
     const result = parseYaml(content);
     expect(result.tension).toBe(0.5);
+  });
+});
+
+describe('preprocessYamlContent', () => {
+  it('replaces tabs with 4 spaces', () => {
+    const input = 'type: bar\n\tlabels: [A, B]\n\tseries:\n\t\t- data: [1, 2]';
+    const result = preprocessYamlContent(input);
+    expect(result).not.toContain('\t');
+    expect(result).toBe('type: bar\n    labels: [A, B]\n    series:\n        - data: [1, 2]');
+  });
+
+  it('replaces multiple consecutive tabs with correct number of spaces', () => {
+    const input = '\t\ttype: bar';
+    const result = preprocessYamlContent(input);
+    expect(result).toBe('        type: bar');
+  });
+
+  it('does not strip code fences by default', () => {
+    const input = '```chart\ntype: bar\nlabels: [A]\n```';
+    const result = preprocessYamlContent(input);
+    expect(result).toContain('```chart');
+    expect(result).toContain('```');
+  });
+
+  it('strips code fences when stripFences is true', () => {
+    const input = '```chart\ntype: bar\nlabels: [A]\n```';
+    const result = preprocessYamlContent(input, true);
+    expect(result).not.toContain('```chart');
+    expect(result).not.toContain('```');
+    expect(result).toContain('type: bar');
+  });
+
+  it('replaces tabs AND strips fences when stripFences is true', () => {
+    const input = '```chart\ntype: bar\n\tlabels: [A, B]\n```';
+    const result = preprocessYamlContent(input, true);
+    expect(result).not.toContain('\t');
+    expect(result).not.toContain('```');
+    expect(result).toContain('    labels: [A, B]');
+  });
+
+  it('leaves content without tabs or fences unchanged', () => {
+    const input = 'type: bar\nlabels: [A, B]\nseries:\n  - data: [1, 2]';
+    const result = preprocessYamlContent(input);
+    expect(result).toBe(input);
+  });
+
+  it('handles empty string', () => {
+    expect(preprocessYamlContent('')).toBe('');
+    expect(preprocessYamlContent('', true)).toBe('');
+  });
+
+  it('handles content with only fences and no inner content', () => {
+    const input = '```chart\n```';
+    const result = preprocessYamlContent(input, true);
+    expect(result).toBe('\n');
+  });
+
+  it('works end-to-end: preprocessed tab-YAML can be parsed by parseYaml', () => {
+    const input = 'type: bar\nlabels: [A, B]\nseries:\n\t  - title: S1\n\t    data: [1, 2]';
+    const preprocessed = preprocessYamlContent(input);
+    const parsed = parseYaml(preprocessed);
+    expect(parsed.type).toBe('bar');
+    expect(parsed.labels).toEqual(['A', 'B']);
+    expect(parsed.series).toHaveLength(1);
   });
 });

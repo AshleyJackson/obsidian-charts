@@ -16,7 +16,7 @@ import { ChartSettingTab } from './ui/settingsTab';
 import { CreationHelperModal } from './ui/creationHelperModal';
 import { addIcons } from 'src/ui/icons';
 import { chartFromTable } from 'src/chartFromTable';
-import { renderError, saveImageToVaultAndPaste } from 'src/util';
+import { renderError, saveImageToVaultAndPaste, preprocessYamlContent } from 'src/util';
 import type { ChartYaml, DatasetPrepResult } from './types';
 import type { ChartConfiguration } from 'chart.js';
 import type { Chart } from 'chart.js';
@@ -33,7 +33,7 @@ export default class ChartPlugin extends Plugin {
     console.log('Charts: Processing chart code block, content length:', content.length);
     let data: ChartYaml;
     try {
-      data = await parseYaml(content.replace(/\t/g, '    ')) as ChartYaml;
+      data = await parseYaml(preprocessYamlContent(content)) as ChartYaml;
       console.log('Charts: Parsed YAML data:', data.type, 'labels length:', data.labels?.length, 'series count:', data.series?.length);
     } catch (error: unknown) {
       console.error('Charts: YAML parse error:', error);

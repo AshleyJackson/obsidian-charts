@@ -5,7 +5,7 @@ import { CandlestickController, CandlestickElement, OhlcController, OhlcElement 
 import './date-adapter/chartjs-adapter-moment.esm.js';
 import { MarkdownRenderChild, parseYaml, TFile } from 'obsidian';
 import type { MarkdownPostProcessorContext } from 'obsidian';
-import { generateInnerColors, renderError } from 'src/util';
+import { generateInnerColors, renderError, preprocessYamlContent } from 'src/util';
 import type { ImageOptions } from './constants/settingsConstants';
 import type ChartPlugin from 'src/main';
 import { generateTableData } from 'src/chartFromTable';
@@ -284,7 +284,7 @@ export default class Renderer {
     const destination = document.createElement('canvas');
     const destinationContext = destination.getContext("2d")!;
 
-    const parsedYaml = await parseYaml(yaml.replace("```chart", "").replace("```", "").replace(/\t/g, '    ')) as ChartYaml;
+    const parsedYaml = await parseYaml(preprocessYamlContent(yaml, true)) as ChartYaml;
     const chartOptions = await this.datasetPrep(parsedYaml, document.body);
     console.log('Charts: Prepared options for image');
 

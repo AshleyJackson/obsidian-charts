@@ -3,7 +3,7 @@
   import type Renderer from "../chartRenderer";
   import { createEventDispatcher } from "svelte";
   import CollapsibleSection from './CollapsibleSection.svelte'
-  import { renderError } from "src/util";
+  import { renderError, preprocessYamlContent } from "src/util";
   import type { DataField } from "src/constants/settingsConstants";
 import type { Chart } from "chart.js";
 
@@ -30,7 +30,7 @@ import type { Chart } from "chart.js";
     async (yaml: any, el: HTMLElement) => {
       if(lastChart) lastChart.destroy();
       previewElement.lastElementChild?.remove();
-      lastChart = renderer.renderRaw(await renderer.datasetPrep(parseYaml(yaml), el), el);
+      lastChart = renderer.renderRaw(await renderer.datasetPrep(parseYaml(preprocessYamlContent(yaml)), el), el);
     },
     500,
     true

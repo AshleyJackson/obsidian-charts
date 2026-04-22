@@ -3,6 +3,15 @@ import chroma from "chroma-js";
 import type { ChartPluginSettings } from "src/constants/settingsConstants";
 import type Renderer from "src/chartRenderer";
 
+/** Preprocess YAML content before parsing: replace tabs with spaces and strip code fences. */
+export function preprocessYamlContent(content: string, stripFences = false): string {
+  let result = content.replace(/\t/g, '    ');
+  if (stripFences) {
+    result = result.replace("```chart", "").replace("```", "");
+  }
+  return result;
+}
+
 export function generateInnerColors(colors: string[], alpha = 0.25) {
     if(typeof alpha != 'number') throw "Provided alpha value is not a number"
     return colors.map((color: string) => chroma(color.trim()).alpha(alpha).hex());
