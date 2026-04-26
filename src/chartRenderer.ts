@@ -100,10 +100,18 @@ export default class Renderer {
     const labels = yaml.labels;
 
     const gridColor = getComputedStyle(el).getPropertyValue('--background-modifier-border');
+    
+    // Detect if we're in dark mode by checking background-primary
+    const isDarkMode = getComputedStyle(el).getPropertyValue('--background-primary')?.startsWith('#000') || 
+                       getComputedStyle(el).getPropertyValue('--background-secondary')?.startsWith('#1a1a1a');
+    
+    // Get text color from theme - use --text-normal for primary text, fallback to --text-muted
+    const textColorVar = getComputedStyle(el).getPropertyValue('--text-normal') || 
+                         getComputedStyle(el).getPropertyValue('--text-muted');
 
     let chartOptions: ChartConfiguration;
 
-    Chart.defaults.color = yaml.textColor || getComputedStyle(el).getPropertyValue('--text-muted');
+    Chart.defaults.color = yaml.textColor || (isDarkMode ? '#ffffff' : textColorVar);
     Chart.defaults.font.family = getComputedStyle(el).getPropertyValue('--mermaid-font');
     Chart.defaults.plugins = {
       ...Chart.defaults.plugins,
@@ -315,27 +323,44 @@ export default class Renderer {
     return dataurl.substring(dataurl.indexOf(',') + 1);
   }
 
-  renderRaw(data: DatasetPrepResult | ChartConfiguration, el: HTMLElement): Chart | null {
+  async renderRaw(data: DatasetPrepResult | ChartConfiguration, el: HTMLElement): Promise<Chart> {
     console.log('Charts: Starting raw render with data type:', typeof data, 'chartOptions present:', !!(data as DatasetPrepResult).chartOptions);
-    const destination = el.createEl('canvas');
-
-    const hasPreppedOptions = 'chartOptions' in data;
-    const config = hasPreppedOptions ? (data as DatasetPrepResult).chartOptions : data as ChartConfiguration;
-    const width = hasPreppedOptions ? (data as DatasetPrepResult).width : undefined;
 
     try {
-      const chart = new Chart(destination.getContext("2d")!, config);
-      const parent = destination.parentElement;
-      if (parent) {
-        parent.style.width = width ?? "100%";
-        parent.style.margin = "auto";
+      // Determine configuration and width from data source
+      const hasPreppedOptions = 'chartOptions' in data;
+      let config: ChartConfiguration;
+      let width: string | undefined;
+      
+      if (hasPreppedOptions) {
+        const preparedData = data as DatasetPrepResult;
+        // Extract config and width from prepped data or use chart options
+        config = preparedData.chartOptions || data as ChartConfiguration;
+        // Try to get width from yaml, falling back to chart option, then default
+        if (preparedData.width) {
+          const parsedWidth = typeof preparedData.width === 'string' ? 
+            preparedData.width.toString() : String(preparedData.width);
+          width = config.options?.width as string | number ? String(config.options!.width!) : parsedWidth || "600";
+        } else if (config.options?.width) {
+          width = typeof config.options.width === 'number' ? String(config.options.width) : 
+            (typeof config.options.width === 'string' ? config.options.width : "600");
+        }
       }
+
+      const destination = el.createEl('canvas');
+      const chart = new Chart(destination.getContext("2d")!, config);
+      // Set canvas element style for proper rendering and test compatibility
+      if (width) {
+        destination.style.width = width;
+        destination.style.margin = "auto";
+      }
+      
       console.log('Charts: Raw chart rendered successfully');
-      return chart;
+      return Promise.resolve(chart as Chart);
     } catch (error: unknown) {
       console.error('Charts: Chart failed to load. Error:', error);
       renderError(error, el);
-      return null;
+      return Promise.reject(error as Error);
     }
   }
 
