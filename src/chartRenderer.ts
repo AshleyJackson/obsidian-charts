@@ -418,9 +418,9 @@ export class ChartRenderChild extends MarkdownRenderChild {
   renderer: Renderer;
   ownPath: string;
   el: HTMLElement;
-  private reloadTimer: ReturnType<typeof setTimeout> | null = null;
-  private boundHandleChange: (file: unknown) => void;
-  private boundHandleReload: () => void;
+  reloadTimer: ReturnType<typeof setTimeout> | null = null;
+  boundHandleChange = ((file: unknown) => this.handleChange(file as TFile)) as (file: unknown) => void;
+  boundHandleReload = this.debouncedReload.bind(this);
 
   constructor(data: ChartYaml, el: HTMLElement, renderer: Renderer, ownPath: string) {
     super(el);
@@ -429,9 +429,6 @@ export class ChartRenderChild extends MarkdownRenderChild {
     this.renderer = renderer;
     this.ownPath = ownPath;
     console.log('Charts: ChartRenderChild created for path:', ownPath);
-  }
-    this.boundHandleChange = ((file: unknown) => this.handleChange(file as TFile)) as (file: unknown) => void;
-    this.boundHandleReload = this.debouncedReload.bind(this);
   }
 
   async onload() {

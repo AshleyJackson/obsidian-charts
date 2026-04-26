@@ -1,4 +1,4 @@
-<script lang="ts" defer>
+<script lang="ts">
   import { debounce, Editor, parseYaml } from "obsidian";
   import type Renderer from "../chartRenderer";
   import { createEventDispatcher } from "svelte";
@@ -236,33 +236,35 @@ bestFitNumber: ${bestFitNumber}`;
         <tr>
           <td class="desc"
           ><p class="mainDesc">Best Fit Line ID</p>
-            <p class="subDesc">The line ID used to create the line of best fit</p></td
-          ><td class="controlElement"
-        ><input
+            <p class="subDesc">The line ID used to create the line of best fit</p></td>
+          <td class="controlElement">
+            <input
                 type="text"
                 placeholder="0"
                 style="width: 26px; height: 32px"
                 bind:value={bestFitNumber}
-        /><br />
+            /><br />
+          </td>
         </tr>
         <tr>
           <td class="desc"
           ><p class="mainDesc">Line of Best Fit Title</p>
-            <p class="subDesc">The title for the line of best fit</p></td
-          ><td class="controlElement">
-          <input
-                  type="text"
-                  placeholder="Line of Best Fit"
-                  style="width: 96px; height: 32px"
-                  bind:value={bestFitTitle}
-          /><br />
-        </tr>
-        </tbody>
-      </table>
-        </CollapsibleSection>
+            <p class="subDesc">The title for the line of best fit</p></td>
+          <td class="controlElement">
+            <input
+                type="text"
+                placeholder="Line of Best Fit"
+                style="width: 96px; height: 32px"
+                bind:value={bestFitTitle}
+            /><br />
+          </td>
+            </tr>
+          </tbody>
+        </table>
+      </CollapsibleSection>
     </div>
     <div class="chartPreview">
-      <div id="preview" bind:this={previewElement} />
+      <div id="preview" class="svelte-1dwkjmb"></div>
     </div>
   </div>
   <hr />
