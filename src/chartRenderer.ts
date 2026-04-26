@@ -19,10 +19,12 @@ export default class Renderer {
 
   constructor(plugin: ChartPlugin) {
     this.plugin = plugin;
+    console.log('Charts: Renderer created, settings.themeable:', this.plugin.settings.themeable);
   }
 
   async datasetPrep(yaml: ChartYaml, el: HTMLElement, themeColors = false): Promise<DatasetPrepResult> {
     console.log('Charts: Preparing dataset for type:', yaml.type, 'with series count:', yaml.series?.length ?? 0);
+    console.log('Charts: datasetPrep called with themeColors:', themeColors);
     // Datasets are loosely typed because they come from YAML parsing and must be cast
     // to chart.js's strict generic ChartDataset at the ChartConfiguration boundary
     const datasets: Record<string, unknown>[] = [];
@@ -41,6 +43,7 @@ export default class Renderer {
         }
       }
       console.log('Charts: Using colors:', colors.length > 0 ? 'theme colors' : 'default colors');
+      console.log('Charts: Themeable setting:', this.plugin.settings.themeable);
 
       const seriesList = yaml.series ?? [];
       for (let i = 0; i < seriesList.length; i++) {
@@ -75,6 +78,7 @@ export default class Renderer {
           stepped: yaml.stepped,
           ...rest,
         };
+        console.log('Charts: Dataset colors - backgroundColor:', dataset.backgroundColor, 'borderColor:', dataset.borderColor);
         if (yaml.type === 'sankey') {
           if (rest.colorFrom) {
             const seriesColorFrom = seriesList[i].colorFrom as Record<string, string> | undefined;
@@ -102,17 +106,39 @@ export default class Renderer {
     const gridColor = getComputedStyle(el).getPropertyValue('--background-modifier-border');
     
     // Detect if we're in dark mode by checking background-primary
-    const isDarkMode = getComputedStyle(el).getPropertyValue('--background-primary')?.startsWith('#000') || 
-                       getComputedStyle(el).getPropertyValue('--background-secondary')?.startsWith('#1a1a1a');
+    const bgPrimaryEl = getComputedStyle(document.body).getPropertyValue('--background-primary').trim();
+    const isDarkMode = bgPrimaryEl?.startsWith('#000') || 
+                       (bgPrimaryEl && bgPrimaryEl.length > 3 && parseInt(bgPrimaryEl.slice(1, 3), 16) < 50);
+    
+    console.log('Charts: Theme detection - document.body background-primary:', bgPrimaryEl, 'isDarkMode:', isDarkMode);
     
     // Get text color from theme - use --text-normal for primary text, fallback to --text-muted
-    const textColorVar = getComputedStyle(el).getPropertyValue('--text-normal') || 
-                         getComputedStyle(el).getPropertyValue('--text-muted');
+    const textColorVar = getComputedStyle(document.body).getPropertyValue('--text-normal').trim() || 
+                         getComputedStyle(document.body).getPropertyValue('--text-muted').trim();
+
+    console.log('Charts: Theme colors - document.body text-normal:', textColorVar);
+    
+    // Debug: Show all relevant CSS variables from document body
+    const cssVars = [
+      '--background-primary',
+      '--background-secondary', 
+      '--text-normal',
+      '--text-muted',
+      '--mermaid-font'
+    ];
+    console.log('Charts: All theme CSS variables:', cssVars.map(v => `${v}: ${getComputedStyle(document.body).getPropertyValue(v)}`));
 
     let chartOptions: ChartConfiguration;
 
-    Chart.defaults.color = yaml.textColor || (isDarkMode ? '#ffffff' : textColorVar);
-    Chart.defaults.font.family = getComputedStyle(el).getPropertyValue('--mermaid-font');
+    const finalTextColor = yaml.textColor || (isDarkMode ? '#ffffff' : textColorVar);
+    console.log('Charts: Final chart color setting:', finalTextColor, 'isDarkMode:', isDarkMode);
+
+    Chart.defaults.color = finalTextColor;
+    console.log('Charts: Setting Chart.defaults.color to:', Chart.defaults.color);
+    
+    const fontFamily = getComputedStyle(el).getPropertyValue('--mermaid-font').trim();
+    Chart.defaults.font.family = fontFamily || 'sans-serif';
+    console.log('Charts: Setting Chart.defaults.font.family to:', Chart.defaults.font.family);
     Chart.defaults.plugins = {
       ...Chart.defaults.plugins,
       legend: {
@@ -150,7 +176,7 @@ export default class Renderer {
         },
       } as unknown as ChartConfiguration;
     } else if (yaml.type === 'bar' || yaml.type === 'line') {
-      console.log('Charts: Configuring bar/line chart');
+      console.log('Charts: Configuring bar/line chart, Chart.defaults.color:', Chart.defaults.color);
       chartOptions = {
         type: yaml.type,
         data: {
@@ -348,7 +374,20 @@ export default class Renderer {
       }
 
       const destination = el.createEl('canvas');
+      console.log('Charts: About to create Chart instance with config:', JSON.stringify(config, null, 2).substring(0, 500) + '...');
       const chart = new Chart(destination.getContext("2d")!, config);
+      console.log('Charts: Chart created, checking color options:', config.options?.scales?.x?.ticks?.color, config.options?.scales?.y?.ticks?.color);
+      
+      // Check if the chart instance has any custom colors set
+      const datasets = (chart.data as any)?.datasets;
+      console.log('Charts: Chart datasets count:', datasets ? datasets.length : 0);
+      for (let i = 0; i < (datasets || []).length && i < 3; i++) {
+        const ds = (datasets[i] as any);
+        console.log(`Charts: Dataset ${i} colors - backgroundColor:`, ds.backgroundColor, `borderColor:`, ds.borderColor);
+      }
+      
+      // Check Chart defaults after creation
+      console.log('Charts: After chart creation - Chart.defaults.color:', Chart.defaults.color);
       // Set canvas element style for proper rendering and test compatibility
       if (width) {
         destination.style.width = width;
@@ -356,6 +395,9 @@ export default class Renderer {
       }
       
       console.log('Charts: Raw chart rendered successfully');
+      console.log('Charts: Chart instance created, checking defaults:', Chart.defaults.color);
+      console.log('Charts: Chart instance type:', typeof chart);
+      console.log('Charts: Chart has destroy method:', typeof chart.destroy);
       return Promise.resolve(chart as Chart);
     } catch (error: unknown) {
       console.error('Charts: Chart failed to load. Error:', error);
@@ -365,6 +407,7 @@ export default class Renderer {
   }
 
   async renderFromYaml(yaml: ChartYaml, el: HTMLElement, ctx: MarkdownPostProcessorContext) {
+    console.log('Charts: renderFromYaml called');
     this.plugin.app.workspace.onLayoutReady(() => ctx.addChild(new ChartRenderChild(yaml, el, this, ctx.sourcePath)));
   }
 }
@@ -385,12 +428,19 @@ export class ChartRenderChild extends MarkdownRenderChild {
     this.data = data;
     this.renderer = renderer;
     this.ownPath = ownPath;
+    console.log('Charts: ChartRenderChild created for path:', ownPath);
+  }
     this.boundHandleChange = ((file: unknown) => this.handleChange(file as TFile)) as (file: unknown) => void;
     this.boundHandleReload = this.debouncedReload.bind(this);
   }
 
   async onload() {
-    console.log('Charts: Loading chart render child for data:', this.data);
+    console.log('Charts: ChartRenderChild.onload starting');
+    const isDarkMode = getComputedStyle(document.body).getPropertyValue('--background-primary').trim()?.startsWith('#000') || 
+                       (getComputedStyle(document.body).getPropertyValue('--background-primary').trim() && 
+                        getComputedStyle(document.body).getPropertyValue('--background-primary').trim().length > 3 && 
+                        parseInt(getComputedStyle(document.body).getPropertyValue('--background-primary').trim().slice(1, 3), 16) < 50);
+    console.log('Charts: Theme detection - isDarkMode:', isDarkMode);
     try {
       const preparedData = await this.renderer.datasetPrep(this.data, this.el);
       console.log('Charts: Prepared dataset:', preparedData);
@@ -464,6 +514,7 @@ export class ChartRenderChild extends MarkdownRenderChild {
           throw new Error("There is no table at that id and/or file");
         }
         chartData.labels = tableData.labels;
+        console.log('Charts: ChartRenderChild onload - preparing dataset');
         for (let i = 0; i < tableData.dataFields.length; i++) {
           // Convert string data to numbers; empty cells become null for proper spanGaps support
           const numericData = tableData.dataFields[i].data.map((v: string) => {
@@ -472,6 +523,7 @@ export class ChartRenderChild extends MarkdownRenderChild {
             const num = parseFloat(trimmed);
             return isNaN(num) ? null : num;
           });
+          console.log('Charts: Dataset colors - backgroundColor:', colors.length > 0 ? 'theme' : 'default');
           chartData.datasets.push({
             label: tableData.dataFields[i].dataTitle ?? "",
             data: numericData,
@@ -491,7 +543,8 @@ export class ChartRenderChild extends MarkdownRenderChild {
         console.log('Charts: Updated chart options with table data');
       }
       this.chart = this.renderer.renderRaw(preparedData, this.el);
-      console.log('Charts: Rendered chart successfully');
+      console.log('Charts: Chart rendered successfully');
+      console.log('Charts: Final chart color:', Chart.defaults.color);
     } catch (error: unknown) {
       console.error('Charts: Error in onload:', error);
       renderError(error, this.el);
@@ -537,9 +590,9 @@ export class ChartRenderChild extends MarkdownRenderChild {
     this.renderer.plugin.app.metadataCache.off("changed", this.boundHandleChange);
     this.renderer.plugin.app.workspace.off('css-change', this.boundHandleReload);
     this.el.empty();
-    if (this.chart) {
+    if (this.chart && typeof this.chart.destroy === 'function') {
       this.chart.destroy();
-      this.chart = null;
     }
+    this.chart = null;
   }
 }

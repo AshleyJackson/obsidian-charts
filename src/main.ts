@@ -98,10 +98,12 @@ export default class ChartPlugin extends Plugin {
 
   async onload() {
     console.log('Charts: Loading plugin');
-
+    
     await this.loadSettings();
+    console.log('Charts: Settings loaded - themeable:', this.settings.themeable);
 
     this.renderer = new Renderer(this);
+    console.log('Charts: Renderer created, settings.themeable:', this.settings.themeable);
 
     type RenderChartFn = (data: unknown, el: HTMLElement) => Promise<Chart | null> | Chart | null;
     (window as unknown as { renderChart: RenderChartFn }).renderChart = async (data: unknown, el: HTMLElement): Promise<Chart | null> => {
