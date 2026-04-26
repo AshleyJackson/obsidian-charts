@@ -33,11 +33,8 @@ function isDateLike(value: string): boolean {
 }
 
 export async function chartFromTable(editor: Editor, layout: 'columns' | 'rows') {
-  console.log('Charts: Starting chart from table generation with layout:', layout);
   const selection = editor.getSelection();
-  console.log('Charts: Selected table text length:', selection.length);
   const {labels, dataFields} = generateTableData(selection, layout);
-  console.log('Charts: Generated labels:', labels, 'dataFields count:', dataFields.length);
   const chart = `\`\`\`chart
 type: bar
 labels: [${labels}]
@@ -50,17 +47,10 @@ width: 80%
 beginAtZero: true
 \`\`\``;
 
-  console.log('Charts: Generated chart code length:', chart.length);
   editor.replaceSelection(chart);
-  console.log('Charts: Replaced selection with chart code');
 }
 
 export function generateTableData(table: string, layout: 'columns' | 'rows', selected?: string[]): { labels: string[]; dataFields: DataField[] } {
-  console.log('Charts: Generating table data with layout:', layout, 'table length:', table.length);
-
-  // Preserve escaped pipes in wikilinks (e.g., [[Page|Alias]]) before parsing.
-  // The markdown parser treats \| as a table delimiter, splitting the cell.
-  // We temporarily replace \| inside [[...]] with a placeholder, then restore after parsing.
   const PIPE_PLACEHOLDER = '\x00WIKILINK_PIPE\x00';
   const tableWithPlaceholders = table.replace(/\[\[([^\]]*?)\\\|([^\]]*?)\]\]/g, (_match: string, before: string, after: string) => {
     return `[[${before}${PIPE_PLACEHOLDER}${after}]]`;
@@ -73,9 +63,7 @@ export function generateTableData(table: string, layout: 'columns' | 'rows', sel
       throw new Error("Table extraction returned null");
     }
     fields = extracted;
-    console.log('Charts: Extracted fields keys:', Object.keys(fields));
   } catch (error: unknown) {
-    console.error('Charts: Error extracting table:', error);
     new Notice('Table malformed');
     throw error;
   }
@@ -102,7 +90,6 @@ export function generateTableData(table: string, layout: 'columns' | 'rows', sel
     throw new Error("No data found in table");
   }
   let labels = Object.keys(firstEntry);
-  console.log('Charts: Extracted labels:', labels);
   
   let dataFields: DataField[] = Object.keys(fields).map((key) => {
     return {
@@ -110,16 +97,12 @@ export function generateTableData(table: string, layout: 'columns' | 'rows', sel
       data: Object.values(fields[key]) as string[]
     }
   });
-  console.log('Charts: Created dataFields:', dataFields.map(f => ({title: f.dataTitle, dataLength: f.data.length})));
   
-  // Auto-detect if field keys are dates - transpose for time series
   const fieldKeys = Object.keys(fields);
   const dateLikeKeys = fieldKeys.filter((key: string) => isDateLike(key));
   const majorityAreDates = dateLikeKeys.length > fieldKeys.length / 2;
   
   if (majorityAreDates && fieldKeys.length > 1) {
-    console.log('Charts: Date-like field keys detected, transposing for time series');
-    // Transpose: dates become labels, current labels become series titles
     const transposedLabels = fieldKeys;
     const transposedFields: DataField[] = labels.map((label: string) => ({
       dataTitle: label,
@@ -128,11 +111,9 @@ export function generateTableData(table: string, layout: 'columns' | 'rows', sel
     
     labels = transposedLabels;
     dataFields = transposedFields;
-    console.log('Charts: Transposed - labels are now dates:', labels.slice(0, 3), '...', 'series count:', dataFields.length);
   }
 
   if(selected) {
-    console.log('Charts: Filtering by selected fields:', selected);
     dataFields = dataFields.filter(value => selected.includes(value.dataTitle));
   }
 

@@ -19,14 +19,9 @@ export default class Renderer {
 
   constructor(plugin: ChartPlugin) {
     this.plugin = plugin;
-    console.log('Charts: Renderer created, settings.themeable:', this.plugin.settings.themeable);
   }
 
   async datasetPrep(yaml: ChartYaml, el: HTMLElement, themeColors = false): Promise<DatasetPrepResult> {
-    console.log('Charts: Preparing dataset for type:', yaml.type, 'with series count:', yaml.series?.length ?? 0);
-    console.log('Charts: datasetPrep called with themeColors:', themeColors);
-    // Datasets are loosely typed because they come from YAML parsing and must be cast
-    // to chart.js's strict generic ChartDataset at the ChartConfiguration boundary
     const datasets: Record<string, unknown>[] = [];
     if (!yaml.id) {
       const colors: string[] = [];
@@ -42,9 +37,6 @@ export default class Renderer {
           }
         }
       }
-      console.log('Charts: Using colors:', colors.length > 0 ? 'theme colors' : 'default colors');
-      console.log('Charts: Themeable setting:', this.plugin.settings.themeable);
-
       const seriesList = yaml.series ?? [];
       for (let i = 0; i < seriesList.length; i++) {
         const { title, ...rest } = seriesList[i];
@@ -78,23 +70,6 @@ export default class Renderer {
           stepped: yaml.stepped,
           ...rest,
         };
-        console.log('Charts: Dataset colors - backgroundColor:', dataset.backgroundColor, 'borderColor:', dataset.borderColor);
-        if (yaml.type === 'sankey') {
-          if (rest.colorFrom) {
-            const seriesColorFrom = seriesList[i].colorFrom as Record<string, string> | undefined;
-            (dataset as Record<string, unknown>)['colorFrom'] = (ctx: unknown) => {
-              const c = ctx as { dataset: { data: Array<{ from: string }> }; dataIndex: number };
-              return seriesColorFrom?.[c.dataset.data[c.dataIndex].from] ?? colors[i] ?? 'green';
-            };
-          }
-          if (rest.colorTo) {
-            const seriesColorTo = seriesList[i].colorTo as Record<string, string> | undefined;
-            (dataset as Record<string, unknown>)['colorTo'] = (ctx: unknown) => {
-              const c = ctx as { dataset: { data: Array<{ to: string }> }; dataIndex: number };
-              return seriesColorTo?.[c.dataset.data[c.dataIndex].to] ?? colors[i] ?? 'green';
-            };
-          }
-        }
         datasets.push(dataset);
       }
     }
@@ -103,42 +78,25 @@ export default class Renderer {
 
     const labels = yaml.labels;
 
-    const gridColor = getComputedStyle(el).getPropertyValue('--background-modifier-border');
-    
-    // Detect if we're in dark mode by checking background-primary
     const bgPrimaryEl = getComputedStyle(document.body).getPropertyValue('--background-primary').trim();
     const isDarkMode = bgPrimaryEl?.startsWith('#000') || 
                        (bgPrimaryEl && bgPrimaryEl.length > 3 && parseInt(bgPrimaryEl.slice(1, 3), 16) < 50);
     
-    console.log('Charts: Theme detection - document.body background-primary:', bgPrimaryEl, 'isDarkMode:', isDarkMode);
+    const gridColor = getComputedStyle(document.body).getPropertyValue('--background-modifier-border').trim() || 
+                      (isDarkMode ? '#444444' : 'rgba(0,0,0,0.1)');
     
-    // Get text color from theme - use --text-normal for primary text, fallback to --text-muted
     const textColorVar = getComputedStyle(document.body).getPropertyValue('--text-normal').trim() || 
                          getComputedStyle(document.body).getPropertyValue('--text-muted').trim();
 
-    console.log('Charts: Theme colors - document.body text-normal:', textColorVar);
-    
-    // Debug: Show all relevant CSS variables from document body
-    const cssVars = [
-      '--background-primary',
-      '--background-secondary', 
-      '--text-normal',
-      '--text-muted',
-      '--mermaid-font'
-    ];
-    console.log('Charts: All theme CSS variables:', cssVars.map(v => `${v}: ${getComputedStyle(document.body).getPropertyValue(v)}`));
+    console.log('Charts: isDarkMode:', isDarkMode, 'background-primary:', bgPrimaryEl, 'text-normal:', textColorVar);
 
     let chartOptions: ChartConfiguration;
 
     const finalTextColor = yaml.textColor || (isDarkMode ? '#ffffff' : textColorVar);
-    console.log('Charts: Final chart color setting:', finalTextColor, 'isDarkMode:', isDarkMode);
-
     Chart.defaults.color = finalTextColor;
-    console.log('Charts: Setting Chart.defaults.color to:', Chart.defaults.color);
     
-    const fontFamily = getComputedStyle(el).getPropertyValue('--mermaid-font').trim();
+    const fontFamily = getComputedStyle(document.body).getPropertyValue('--mermaid-font').trim();
     Chart.defaults.font.family = fontFamily || 'sans-serif';
-    console.log('Charts: Setting Chart.defaults.font.family to:', Chart.defaults.font.family);
     Chart.defaults.plugins = {
       ...Chart.defaults.plugins,
       legend: {
@@ -150,7 +108,6 @@ export default class Renderer {
     Chart.defaults.layout.padding = yaml.padding;
 
     if (yaml.type === 'radar' || yaml.type === 'polarArea') {
-      console.log('Charts: Configuring radar/polarArea chart');
       chartOptions = {
         type: yaml.type,
         data: {
@@ -169,14 +126,13 @@ export default class Renderer {
               max: yaml.rMax,
               min: yaml.rMin,
               ticks: {
-                backdropColor: gridColor,
+                backdropColor: isDarkMode ? '#1e1e1e' : 'rgba(255,255,255,0.75)',
               },
             },
           },
         },
       } as unknown as ChartConfiguration;
     } else if (yaml.type === 'bar' || yaml.type === 'line') {
-      console.log('Charts: Configuring bar/line chart, Chart.defaults.color:', Chart.defaults.color);
       chartOptions = {
         type: yaml.type,
         data: {
@@ -228,7 +184,6 @@ export default class Renderer {
         },
       } as unknown as ChartConfiguration;
     } else if (yaml.type === 'sankey') {
-      console.log('Charts: Configuring sankey chart');
       const sankeyDatasets = datasets.map(dataset => {
         return {
           ...dataset,
@@ -253,8 +208,6 @@ export default class Renderer {
         },
       } as unknown as ChartConfiguration;
     } else if (yaml.type === 'candlestick' || yaml.type === 'ohlc') {
-      console.log('Charts: Configuring financial chart for type:', yaml.type);
-      // Financial charts use {o, h, l, c} data points
       const financialDatasets = datasets.map(dataset => {
         return {
           ...dataset,
@@ -293,7 +246,6 @@ export default class Renderer {
         },
       } as unknown as ChartConfiguration;
     } else {
-      console.log('Charts: Configuring pie/doughnut/bubble/scatter chart for type:', yaml.type);
       chartOptions = {
         type: yaml.type,
         data: {
@@ -308,19 +260,16 @@ export default class Renderer {
         },
       } as unknown as ChartConfiguration;
     }
-    console.log('Charts: Dataset prep complete, returning options');
     return { chartOptions, width: yaml.width?.toString() };
   }
 
   async imageRenderer(yaml: string, options: ImageOptions): Promise<string> {
-    console.log('Charts: Starting image renderer for format:', options.format, 'quality:', options.quality);
     const delay = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
     const destination = document.createElement('canvas');
     const destinationContext = destination.getContext("2d")!;
 
     const parsedYaml = await parseYaml(preprocessYamlContent(yaml, true)) as ChartYaml;
     const chartOptions = await this.datasetPrep(parsedYaml, document.body);
-    console.log('Charts: Prepared options for image');
 
     let width = 600;
     if (parsedYaml.width) {
@@ -336,7 +285,6 @@ export default class Renderer {
 
     destination.width = width;
     destination.height = height;
-    console.log('Charts: Canvas dimensions set to', width, 'x', height);
 
     const chart = new Chart(destinationContext, chartOptions.chartOptions);
 
@@ -344,14 +292,11 @@ export default class Renderer {
     await delay(250);
     const dataurl = destination.toDataURL(options.format, options.quality);
     document.body.removeChild(destination);
-    console.log('Charts: Image data URL generated, length:', dataurl.length);
 
     return dataurl.substring(dataurl.indexOf(',') + 1);
   }
 
   async renderRaw(data: DatasetPrepResult | ChartConfiguration, el: HTMLElement): Promise<Chart> {
-    console.log('Charts: Starting raw render with data type:', typeof data, 'chartOptions present:', !!(data as DatasetPrepResult).chartOptions);
-
     try {
       // Determine configuration and width from data source
       const hasPreppedOptions = 'chartOptions' in data;
@@ -374,30 +319,11 @@ export default class Renderer {
       }
 
       const destination = el.createEl('canvas');
-      console.log('Charts: About to create Chart instance with config:', JSON.stringify(config, null, 2).substring(0, 500) + '...');
       const chart = new Chart(destination.getContext("2d")!, config);
-      console.log('Charts: Chart created, checking color options:', config.options?.scales?.x?.ticks?.color, config.options?.scales?.y?.ticks?.color);
-      
-      // Check if the chart instance has any custom colors set
-      const datasets = (chart.data as any)?.datasets;
-      console.log('Charts: Chart datasets count:', datasets ? datasets.length : 0);
-      for (let i = 0; i < (datasets || []).length && i < 3; i++) {
-        const ds = (datasets[i] as any);
-        console.log(`Charts: Dataset ${i} colors - backgroundColor:`, ds.backgroundColor, `borderColor:`, ds.borderColor);
-      }
-      
-      // Check Chart defaults after creation
-      console.log('Charts: After chart creation - Chart.defaults.color:', Chart.defaults.color);
-      // Set canvas element style for proper rendering and test compatibility
       if (width) {
         destination.style.width = width;
         destination.style.margin = "auto";
       }
-      
-      console.log('Charts: Raw chart rendered successfully');
-      console.log('Charts: Chart instance created, checking defaults:', Chart.defaults.color);
-      console.log('Charts: Chart instance type:', typeof chart);
-      console.log('Charts: Chart has destroy method:', typeof chart.destroy);
       return Promise.resolve(chart as Chart);
     } catch (error: unknown) {
       console.error('Charts: Chart failed to load. Error:', error);
@@ -407,7 +333,6 @@ export default class Renderer {
   }
 
   async renderFromYaml(yaml: ChartYaml, el: HTMLElement, ctx: MarkdownPostProcessorContext) {
-    console.log('Charts: renderFromYaml called');
     this.plugin.app.workspace.onLayoutReady(() => ctx.addChild(new ChartRenderChild(yaml, el, this, ctx.sourcePath)));
   }
 }
@@ -428,25 +353,16 @@ export class ChartRenderChild extends MarkdownRenderChild {
     this.data = data;
     this.renderer = renderer;
     this.ownPath = ownPath;
-    console.log('Charts: ChartRenderChild created for path:', ownPath);
   }
 
   async onload() {
-    console.log('Charts: ChartRenderChild.onload starting');
-    const isDarkMode = getComputedStyle(document.body).getPropertyValue('--background-primary').trim()?.startsWith('#000') || 
-                       (getComputedStyle(document.body).getPropertyValue('--background-primary').trim() && 
-                        getComputedStyle(document.body).getPropertyValue('--background-primary').trim().length > 3 && 
-                        parseInt(getComputedStyle(document.body).getPropertyValue('--background-primary').trim().slice(1, 3), 16) < 50);
-    console.log('Charts: Theme detection - isDarkMode:', isDarkMode);
     try {
       const preparedData = await this.renderer.datasetPrep(this.data, this.el);
-      console.log('Charts: Prepared dataset:', preparedData);
       const chartData: { labels: string[]; datasets: Record<string, unknown>[] } = {
         labels: (preparedData.chartOptions.data.labels ?? []) as string[],
         datasets: [],
       };
       if (this.data.id) {
-        console.log('Charts: Processing linked chart with id:', this.data.id);
         const colors: string[] = [];
         if (this.renderer.plugin.settings.themeable) {
           let i = 1;
@@ -505,22 +421,17 @@ export class ChartRenderChild extends MarkdownRenderChild {
         let tableData: { labels: string[]; dataFields: Array<{ dataTitle: string; data: string[] }> };
         try {
           tableData = generateTableData(tableString, this.data.layout ?? 'columns', this.data.select);
-          console.log('Charts: Generated table data:', tableData);
         } catch (error: unknown) {
-          console.error('Charts: Error generating table data:', error);
           throw new Error("There is no table at that id and/or file");
         }
         chartData.labels = tableData.labels;
-        console.log('Charts: ChartRenderChild onload - preparing dataset');
         for (let i = 0; i < tableData.dataFields.length; i++) {
-          // Convert string data to numbers; empty cells become null for proper spanGaps support
           const numericData = tableData.dataFields[i].data.map((v: string) => {
             const trimmed = v.trim();
             if (trimmed === '') return null;
             const num = parseFloat(trimmed);
             return isNaN(num) ? null : num;
           });
-          console.log('Charts: Dataset colors - backgroundColor:', colors.length > 0 ? 'theme' : 'default');
           chartData.datasets.push({
             label: tableData.dataFields[i].dataTitle ?? "",
             data: numericData,
@@ -537,27 +448,19 @@ export class ChartRenderChild extends MarkdownRenderChild {
           });
         }
         preparedData.chartOptions.data = chartData as unknown as typeof preparedData.chartOptions.data;
-        console.log('Charts: Updated chart options with table data');
       }
       this.chart = this.renderer.renderRaw(preparedData, this.el);
-      console.log('Charts: Chart rendered successfully');
-      console.log('Charts: Final chart color:', Chart.defaults.color);
     } catch (error: unknown) {
-      console.error('Charts: Error in onload:', error);
       renderError(error, this.el);
     }
     if (this.data.id) {
-      console.log('Charts: Registering change handler for linked chart');
       this.renderer.plugin.app.metadataCache.on("changed", (file: unknown) => this.handleChange(file as TFile));
     }
     this.renderer.plugin.app.workspace.on('css-change', this.boundHandleReload);
-    console.log('Charts: Registered event listeners');
   }
 
   private handleChange(file: TFile) {
-    console.log('Charts: Metadata changed for file:', file.path);
     if (this.data.file ? file.basename === this.data.file : file.path === this.ownPath) {
-      console.log('Charts: Scheduling reload due to relevant file change');
       this.debouncedReload();
     }
   }
@@ -573,13 +476,11 @@ export class ChartRenderChild extends MarkdownRenderChild {
   }
 
   private handleReload() {
-    console.log('Charts: Reloading chart');
     this.onunload();
     this.onload();
   }
 
   onunload() {
-    console.log('Charts: Unloading chart render child');
     if (this.reloadTimer) {
       clearTimeout(this.reloadTimer);
       this.reloadTimer = null;

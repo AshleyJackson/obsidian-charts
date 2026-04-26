@@ -30,25 +30,20 @@ export default class ChartPlugin extends Plugin {
     el: HTMLElement,
     ctx: MarkdownPostProcessorContext
   ) => {
-    console.log('Charts: Processing chart code block, content length:', content.length);
     let data: ChartYaml;
     try {
       data = await parseYaml(preprocessYamlContent(content)) as ChartYaml;
-      console.log('Charts: Parsed YAML data:', data.type, 'labels length:', data.labels?.length, 'series count:', data.series?.length);
     } catch (error: unknown) {
-      console.error('Charts: YAML parse error:', error);
       renderError(error, el);
       return;
     }
     if (!data.id) {
       if (!data || !data.type || !data.labels || !data.series) {
-        console.error('Charts: Missing required fields in data:', data);
         renderError('Missing type, labels or series', el);
         return;
       }
     }
     if (data.bestFit === true && data.type === 'line' && data.series) {
-      console.log('Charts: Applying best fit line');
       const seriesIndex = data.bestFitNumber != undefined ? Number(data.bestFitNumber) : 0;
       const x = data.series[seriesIndex].data;
 
@@ -81,11 +76,8 @@ export default class ChartPlugin extends Plugin {
         title: title,
         data: YVals,
       });
-      console.log('Charts: Added best fit series:', title);
     }
-    console.log('Charts: Starting render from YAML');
     await this.renderer.renderFromYaml(data, el, ctx);
-    console.log('Charts: Render from YAML complete');
   };
 
   async loadSettings() {
@@ -97,13 +89,9 @@ export default class ChartPlugin extends Plugin {
   }
 
   async onload() {
-    console.log('Charts: Loading plugin');
-    
     await this.loadSettings();
-    console.log('Charts: Settings loaded - themeable:', this.settings.themeable);
 
     this.renderer = new Renderer(this);
-    console.log('Charts: Renderer created, settings.themeable:', this.settings.themeable);
 
     type RenderChartFn = (data: unknown, el: HTMLElement) => Promise<Chart | null> | Chart | null;
     (window as unknown as { renderChart: RenderChartFn }).renderChart = async (data: unknown, el: HTMLElement): Promise<Chart | null> => {
@@ -120,23 +108,17 @@ export default class ChartPlugin extends Plugin {
       return this.renderer.renderRaw(data as DatasetPrepResult | ChartConfiguration, el);
     };
 
-    console.log('Charts: Initialized renderer and global renderChart');
-
     addIcons();
 
     this.addSettingTab(new ChartSettingTab(this.app, this));
 
-    console.log('Charts: Added settings tab');
-
     this.addCommand({
       id: 'creation-helper',
       name: 'Insert new Chart',
-      checkCallback: (checking: boolean) => {
-        console.log('Charts: Checking for creation helper command');
+        checkCallback: (checking: boolean) => {
         const leaf = this.app.workspace.activeLeaf;
         if (leaf && leaf.view instanceof MarkdownView) {
           if (!checking) {
-            console.log('Charts: Opening creation helper modal');
             new CreationHelperModal(
               this.app,
               leaf.view,
@@ -154,7 +136,6 @@ export default class ChartPlugin extends Plugin {
       id: 'chart-from-table-column',
       name: 'Create Chart from Table (Column oriented Layout)',
       editorCheckCallback: (checking: boolean, editor: Editor, view: MarkdownView | MarkdownFileInfo) => {
-        console.log('Charts: Checking for chart from table column command');
         const selection = editor.getSelection();
         if (
           view instanceof MarkdownView &&
@@ -162,7 +143,6 @@ export default class ChartPlugin extends Plugin {
           selection.split('|').length >= 2
         ) {
           if (!checking) {
-            console.log('Charts: Generating chart from table (columns)');
             chartFromTable(editor, 'columns');
           }
           return true;
@@ -175,14 +155,12 @@ export default class ChartPlugin extends Plugin {
       id: 'chart-from-table-row',
       name: 'Create Chart from Table (Row oriented Layout)',
       editorCheckCallback: (checking: boolean, editor: Editor, view: MarkdownView | MarkdownFileInfo) => {
-        console.log('Charts: Checking for chart from table row command');
         if (
           view instanceof MarkdownView &&
           editor.getSelection().split('\n').length >= 3 &&
           editor.getSelection().split('|').length >= 2
         ) {
           if (!checking) {
-            console.log('Charts: Generating chart from table (rows)');
             chartFromTable(editor, 'rows');
           }
           return true;
@@ -195,7 +173,6 @@ export default class ChartPlugin extends Plugin {
       id: 'chart-to-svg',
       name: 'Create Image from Chart',
       editorCheckCallback: (checking: boolean, editor: Editor, view: MarkdownView | MarkdownFileInfo) => {
-        console.log('Charts: Checking for chart to SVG command');
         const viewFile = view instanceof MarkdownView ? view.file : null;
         if (
           view instanceof MarkdownView &&
@@ -204,7 +181,6 @@ export default class ChartPlugin extends Plugin {
           editor.getSelection().endsWith('```')
         ) {
           if (!checking) {
-            console.log('Charts: Starting chart to image rendering');
             new Notice('Rendering Chart...');
             saveImageToVaultAndPaste(
               editor,
@@ -226,8 +202,6 @@ export default class ChartPlugin extends Plugin {
       async (data: string, el: HTMLElement) => this.renderer.renderRaw(JSON.parse(data) as ChartConfiguration, el)
     );
 
-    console.log('Charts: Registered code block processors');
-
     this.registerEvent(
       this.app.workspace.on(
         'editor-menu',
@@ -238,7 +212,6 @@ export default class ChartPlugin extends Plugin {
                 .setTitle('Insert Chart')
                 .setIcon('chart')
                 .onClick(() => {
-                  console.log('Charts: Context menu clicked, opening modal');
                   new CreationHelperModal(
                     this.app,
                     view,
@@ -255,7 +228,5 @@ export default class ChartPlugin extends Plugin {
     console.log('Charts: Plugin fully loaded');
   }
 
-  onunload() {
-    console.log('unloading plugin: Charts');
-  }
+  onunload() {}
 }
